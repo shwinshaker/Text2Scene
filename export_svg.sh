@@ -11,10 +11,12 @@ if [ -z "$1" ];then
     exit 1
 fi
 
+imageDir="images"
 fileName=$1
 baseName=${fileName%.*}
 echo $baseName
 exDirName="m_$baseName"
+cd $imageDir
 if [ -d $exDirName ];then
     cd $exDirName && rm *
     cd ..
@@ -22,4 +24,5 @@ else
     mkdir $exDirName
 fi
 
-./svg-objects-export/svg-objects-export.py $(pwd)/$fileName -d $(pwd)/$exDirName/ --pattern '^A-' --extra " --export-id-only" --prefix ''
+../svg-objects-export/svg-objects-export.py $(pwd)/$fileName -d $(pwd)/$exDirName/ --pattern '^A-' --extra " --export-id-only" --prefix ''
+cd ..
