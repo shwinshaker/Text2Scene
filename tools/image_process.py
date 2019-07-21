@@ -19,62 +19,74 @@ def getLayerNames(file):
     svg_list = doc.getElementsByTagName('svg')
     assert(len(svg_list) == 1)
     svg = svg_list[0]
-    layers = [g for g in svg.childNodes \
+    # layers = [g for g in svg.childNodes \
+    #           if g.nodeType == 1 and \
+    #              g.tagName == 'g' and \
+    #              g.hasAttribute('id')]
+    layers = [g for g in doc.getElementsByTagName('g') \
               if g.nodeType == 1 and \
-                 g.tagName == 'g' and \
                  g.hasAttribute('id')]
     if layers:
+        for layer in layers[1:]:
+            assert(layer in layers[0].parentNode.childNodes), 'Ids not at the same level!'
         return [l.getAttribute('id') for l in layers]
     else:
         if svg.hasAttribute('id'):
             # if single layer case, id belongs to <svg>
+            # todo - check there be at most 1 <g> on each level
             assert(len([g for g in svg.childNodes \
                           if g.nodeType == 1 and \
-                             g.tagName == 'g']) == 1)
+                             g.tagName == 'g']) <= 1)
             return [svg.getAttribute('id')]
         else:
             raise ValueError('No valid id name found!')
 
+def cleanName(name):
+    """
+    remove irregular marks in adobe illustrator
+    """
+    return re.sub('_x?\d+_','',name)
+
 def name2code(name):
     """
-    input: A-1-2-3-4
+    input: A-1-2-3-4 or A1234
     output: [1,2,3,4]
     """
-    return [int(d) for d in name.split('-')[1:]]
+    name = cleanName(name)
+
+    if re.match(r'^A(-\d)+$', name):
+        return [int(d) for d in name.split('-')[1:]]
+    elif re.match(r'^A\d+$', name):
+        return [int(d) for d in list(name)[1:]]
+    else:
+        raise KeyError('%s fails to match with pattern!' % name)
 
 def checkLayerNames(names):
     """
     Check if the names of layers we got make sense
     """
-    ### styling check
-    # names of layers must start with 'A-'
-    for name in names:
-        assert(name.startswith('A-')), "%s does not start with A-" % name
-
-    # names of layers should match \d-\d
-    for name in names:
-        assert(re.match(r'A(-\d)+', name)), "%s does not match the pattern!" % name
-
-    ### sanity check
     cat_codes = [name2code(s)[0] for s in names]
 
     # if background in, it must be the most bottom layer
     if 1 in cat_codes:
         assert(cat_codes.index(1) == 0), 'background should be the most bottom!'
 
-    # if decoration in, it must be the toppest layer
+    # if decoration in, it must be the most top or bottom layer
     if 4 in cat_codes:
-        assert(cat_codes.index(4) == len(cat_codes) - 1), 'decoration should be the most top!'
+        assert(cat_codes.index(4) == 0 or cat_codes.index(4) == len(cat_codes) - 1), 'decoration should be the most top or bottom!'
 
+    ## one of surrounding or person should be in the scene
+    assert(2 in cat_codes or 3 in cat_codes), 'Neither person nor surroundings are found in the scene!'
+
+    # if only one layer, must be surrounding layer
     if len(cat_codes) == 1:
-        # if only one layer, must be surrounding layer
         assert(cat_codes[0] == 2), 'it must be the surrounding layer if there is only one layer'
-    else:
-        # if multiple layers, check the cat order
-        # background 1 - surroundings 2 - person 3 - decoration 4
-        for code1, code2 in zip(cat_codes[:-1], cat_codes[1:]):
-            assert(code2 > code1), \
-               'layer %s should not be below layer %s!' % (code2, code1)
+    # else: ## not necessarily
+    #     # if multiple layers, check the cat order
+    #     # background 1 - surroundings 2 - person 3 - decoration 4
+    #     for code1, code2 in zip(cat_codes[:-1], cat_codes[1:]):
+    #         assert(code2 > code1), \
+    #            'layer %s should not be below layer %s!' % (code2, code1)
 
 
 ### From layer name to image features
@@ -204,13 +216,15 @@ def image2feature(layer_names):
             raise ValueError('Invalid layer type code!')
 
     # surrounding(2) template
-    feat = [[0,[0,0,0]],[0,[0,0,0],[0,0]]]
+    # feat = [[0,[0,0,0]],[0,[0,0,0],[0,0]]]
+    feat = [[[0,0,0,0],[0,0]],[[0,0,0],[0,0]]]
     if code_srd:
         recurReplace(feat, code2indslist(code_srd))
     features.append(oneHotStructEncode(feat))
 
     # person(3) template
-    feat = [0,[0,0,0],[0,0,0,0]]
+    # feat = [0,[0,0,0],[0,0,0,0]]
+    feat = [[0,0,0,0,0],[[0,0,0],0,0,0,0]]
     if code_prs:
         recurReplace(feat, code2indslist(code_prs))
     features.append(oneHotStructEncode(feat))
