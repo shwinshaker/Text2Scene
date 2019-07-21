@@ -88,22 +88,6 @@ class LemmaTokenizer(object):
 
 
 ### joint text and keywords processing
-def getNestedKey(obj, keys=[]):
-    """
-    get all the keys in a nested dictionary
-    """
-    if isinstance(obj, dict):
-        for key in obj:
-            keys.append(key)
-            keys = getNestedKey(obj[key], keys)
-    elif isinstance(obj, list):
-        for key in obj:
-            keys = getNestedKey(key, keys)
-    elif isinstance(obj, str):
-        keys.append(obj)
-    else:
-        raise KeyError
-    return keys
 
 def relaxedSimi(syn1, syn2):
     """
@@ -127,17 +111,12 @@ def maxSentSimi(sent, token):
     """
     return max([maxSimi(wn.synset(t), token) for t in sent])
 
-def keywordSimi(sentence):
+def keywordSimi(sentence, keywords):
     """
     Given a sentence of synset names, compute its similarity with each category keywords
     """
     simis = []
-    for name in getNestedKey(person_dict, keys=[]):
-        simi = maxSentSimi(sentence, name)
-        # print(name, simi)
-        simis.append(simi)
-
-    for name in getNestedKey(surrouding_dict, keys=[]):
+    for name in keywords:
         simi = maxSentSimi(sentence, name)
         # print(name, simi)
         simis.append(simi)

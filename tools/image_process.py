@@ -65,7 +65,13 @@ def checkLayerNames(names):
     """
     Check if the names of layers we got make sense
     """
-    cat_codes = [name2code(s)[0] for s in names]
+
+    if isinstance(names[0], str):
+        cat_codes = [name2code(s)[0] for s in names]
+    elif isinstance(names[0], int):
+        cat_codes = names
+    else:
+        raise TypeError('Invalid input type!')
 
     # if background in, it must be the most bottom layer
     if 1 in cat_codes:
@@ -179,6 +185,58 @@ def oneHotStructEncode(feat):
     concats.append(feat)
     return flattenNested(concats[::-1])
 
+def getNestedKey(obj):
+    """
+    recursion wrapper
+    """
+    keys = []
+    getNestedKey_(obj, keys=keys)
+    return keys
+
+def getNestedKey_(obj, keys=[]):
+    """
+    get all the keys in a nested dictionary
+        todo - keys argument can be saved if use reference
+    """
+    if isinstance(obj, dict):
+        for key in obj:
+            keys.append(key)
+            getNestedKey_(obj[key], keys)
+    elif isinstance(obj, list):
+        for key in obj:
+            getNestedKey_(key, keys)
+    elif isinstance(obj, str):
+        keys.append(obj)
+    else:
+        raise KeyError
+
+def getNestedKeyWithCode(obj, code):
+    keys = []
+    for c in code:
+        if isinstance(obj, dict):
+            key = list(obj.keys())[c - 1]
+            keys.append(key)
+            obj = obj[key]
+        elif isinstance(obj, list):
+            l = []
+            for key in obj:
+                if isinstance(key, str):
+                    l.append(key)
+                elif isinstance(key, dict):
+                    l.extend(list(key.keys()))
+                else:
+                    raise TypeError('Invalid type other than str and dict')
+            key = l[c - 1]
+            keys.append(key)
+            if key in obj:
+                obj = key # should end here
+            else:
+                for obj_ in obj:
+                    if isinstance(obj_, dict) and key in obj_.keys():
+                        obj = obj_[key]
+        else:
+            raise TypeError('Invalid type other than str and dict. Could be incorrect query code!')
+    return keys
 
 def image2feature(layer_names):
     """
@@ -224,7 +282,7 @@ def image2feature(layer_names):
 
     # person(3) template
     # feat = [0,[0,0,0],[0,0,0,0]]
-    feat = [[0,0,0,0,0],[[0,0,0],0,0,0,0]]
+    feat = [[0,0,0,0,0,0],[[0,0,0],0,0,0,0]]
     if code_prs:
         recurReplace(feat, code2indslist(code_prs))
     features.append(oneHotStructEncode(feat))
