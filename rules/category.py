@@ -8,7 +8,7 @@ surrouding_dict['outdoor'] = {'city': ['street', 'building', 'vehicle'], 'field'
 # print(surrouding_dict)
 
 person_dict = dict()
-person_dict['person'] = [{'stand': ['lean', 'back', 'front']}, 'sit', 'sport', 'show', 'gesture']
 person_dict['interact'] = ['office', 'notion', 'family', 'social', 'travel', 'recreation']
+person_dict['person'] = [{'stand': ['lean', 'back', 'front']}, 'sit', 'sport', 'show', 'gesture']
 # print(person_dict)
 

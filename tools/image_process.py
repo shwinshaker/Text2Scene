@@ -6,7 +6,7 @@ import numpy as np
 import glob
 import re
 from itertools import count
-
+from rules.category import person_dict, surrouding_dict
 
 ### Get layer names give the .svg file
 def getLayerNames(file):
@@ -238,9 +238,9 @@ def getNestedKeyWithCode(obj, code):
             raise TypeError('Invalid type other than str and dict. Could be incorrect query code!')
     return keys
 
-def image2feature(layer_names):
+def image2feature_old(layer_names):
     """
-    One-hot encode the names of layers
+    One-hot encode the names of layers. Leaf one-hotting
     """
 
     features = []
@@ -288,4 +288,77 @@ def image2feature(layer_names):
     features.append(oneHotStructEncode(feat))
 
     # print(features)
+    return flattenNested(features)
+
+def getFeatureWithCode(dic, code=None):
+    keywords = []
+    if code:
+        keywords = getNestedKeyWithCode(dic, code)
+    all_keywords = getNestedKey(dic)
+    return [1 if k in keywords else 0 for k in all_keywords]
+
+def getFeatureSimiWithCode(dic, sent, code=None):
+    from tools.text_process import maxSentSimi
+    keywords = []
+    if code:
+        keywords = getNestedKeyWithCode(dic, code)
+    all_keywords = getNestedKey(dic)
+    return [maxSentSimi(sent, k) if k in keywords else 0 for k in all_keywords]
+
+def getFeatureWithLayer():
+    """
+    summarize the layer2code stuff, which head category can be infered from the head code
+    """
+    pass
+
+def image2feature(layer_names):
+    """
+    One-hot encode the names of layers
+    Get all the keywords recursively
+    """
+
+    features = []
+
+    # number of layers
+    features.append(len(layer_names))
+
+    # convert to digit codes first
+    codes = [name2code(name) for name in layer_names]
+
+    # four layer type, binary
+    feat_layer = [0] * 4
+    for code in codes:
+        feat_layer[code[0] - 1] = 1
+    features.append(feat_layer)
+
+    ## todo - summarize this stuff
+    # sub-categories, keyword exists - binary
+    ## In fact: one-hot in each level, ensured by the codes
+    cat_codes = [code[0] for code in codes]
+    for c, dic in zip([2, 3], [surrouding_dict, person_dict]):
+        if c in cat_codes:
+            subcode = codes[cat_codes.index(c)][1:]
+        else:
+            subcode = None
+        features.append(getFeatureWithCode(dic, subcode))
+
+    return flattenNested(features)
+
+def image2SimiFeature(layer_names, sentence):
+    assert(isinstance(layer_names, list))
+    assert(isinstance(layer_names[0], str))
+    assert(isinstance(sentence, list))
+    assert(isinstance(sentence[0], str))
+
+    features = []
+    # sub-categories, keyword simi
+    codes = [name2code(name) for name in layer_names]
+    cat_codes = [code[0] for code in codes]
+    for c, dic in zip([2, 3], [surrouding_dict, person_dict]):
+        if c in cat_codes:
+            subcode = codes[cat_codes.index(c)][1:]
+        else:
+            subcode = None
+        features.append(getFeatureSimiWithCode(dic, sentence, subcode))
+
     return flattenNested(features)
