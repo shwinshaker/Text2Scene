@@ -7,7 +7,8 @@ import glob
 import re
 from itertools import count
 from rules.category import person_dict, surrouding_dict
-from tools.text_process import maxSentSimi
+from tools.text_process import maxSentSimi, sentSimi
+from scipy import sparse
 
 ### Get layer names give the .svg file
 def getLayerNames(file):
@@ -365,3 +366,29 @@ def image2SimiFeature(layer_names, sentence):
         features.append(getFeatureSimiWithCode(dic, sentence, subcode))
 
     return flattenNested(features)
+
+def getCrossSimiWithCode(dic, sent, vocab, code=None):
+    keywords = []
+    if code:
+        keywords = getNestedKeyWithCode(dic, code)
+    all_keywords = getNestedKey(dic)
+    return [sentSimi(sent, k, vocab) if k in keywords else sentSimi(sent, None, vocab) for k in all_keywords]
+
+def getCrossSimi(layer_names, sentence, vocab):
+    assert(isinstance(layer_names, list))
+    assert(isinstance(layer_names[0], str))
+    assert(isinstance(sentence, list))
+    assert(isinstance(sentence[0], str))
+
+    features = []
+    # sub-categories, keyword simi
+    codes = [name2code(name) for name in layer_names]
+    cat_codes = [code[0] for code in codes]
+    for c, dic in zip([2, 3], [surrouding_dict, person_dict]):
+        if c in cat_codes:
+            subcode = codes[cat_codes.index(c)][1:]
+        else:
+            subcode = None
+        features.append(sparse.csr_matrix(getCrossSimiWithCode(dic, sentence, vocab, subcode)))
+
+    return sparse.vstack(features) # flattenNested(features)

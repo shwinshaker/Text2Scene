@@ -45,7 +45,7 @@ class LemmaTokenizer(object):
         synsets = wn.synsets(lemma, tag)
         if len(synsets) >= 1:
             return synsets[0].name()
-        warnings.warn('"%s" does not belong to any synsets.' % lemma)
+        warnings.warn('%s with tag %s does not belong to any synsets.' % (lemma, tag))
         return None
 
     def wsd(self, sent, sentence):
@@ -98,28 +98,37 @@ def relaxedSimi(syn1, syn2):
     except WordNetError:
         return 0
 
-def maxSimi(synset, token):
+def wrapRelaxedSimi(t1, t2):
+    if t1 is None or t2 is None:
+        return 0
+    return relaxedSimi(wn.synset(t1), wn.synset(t2))
+
+def maxSimi(synset, keyword):
     """
     Given a synset, compute its similarity with a keyword (plain english)
         By considering the maximum of its similarities with all the synsets of the keyword
     """
-    return max([relaxedSimi(synset, s) for s in wn.synsets(token)])
+    if keyword is None:
+        return 0
+    return max([relaxedSimi(synset, s) for s in wn.synsets(keyword)])
 
-def maxSentSimi(sent, token):
+def maxSentSimi(sent, keyword):
     """
     Given a sentence of synset names, compute its similarity with a keyword (plain english)
     """
-    return max([maxSimi(wn.synset(t), token) for t in sent])
+    return max([maxSimi(wn.synset(t), keyword) for t in sent])
 
 def keywordSimi(sentence, keywords):
     """
     Given a sentence of synset names, compute its similarity with each category keywords
     """
-    simis = []
-    for name in keywords:
-        simi = maxSentSimi(sentence, name)
-        # print(name, simi)
-        simis.append(simi)
+    return [maxSentSimi(sentence, k) for k in keywords]
 
-    return simis
+def sentSimi(sent, keyword, vocab):
+    """
+    Given a vocab, compute the similarity of each token in it with a keyword
+        if it is included in the sentence
+    """
+    # return [maxSimi(wn.synset(t), keyword) if t in sent else 0 for t in vocab]
+    return [wrapRelaxedSimi(t, keyword) if t in sent else 0 for t in vocab]
 
