@@ -7,8 +7,7 @@ import glob
 import re
 from itertools import count
 from rules.category import person_dict, surrouding_dict
-from tools.text_process import maxSentSimi, sentSimi
-from scipy import sparse
+from tools.common import flattenNested, extractLeaf, getDepth
 
 ### Get layer names give the .svg file
 def getLayerNames(file):
@@ -101,78 +100,6 @@ def checkLayerNames(names):
 
 
 ### From layer name to image features
-def getDepth(li):
-    """
-    Get the depth of a nested list
-    """
-    for level in count():
-        if not li:
-            return level
-        li = [e for l in li if isinstance(l, list) for e in l]
-
-def recurReplace(nested, id_list, value=1):
-    """
-    Replace an element in a nested list recursively
-    """
-    # number of indexes should be lower than the depth
-    assert(len(id_list) <= getDepth(nested))
-
-    # print(nested, '--', id_list)
-    if len(id_list) > 1:
-        recurReplace(nested[id_list[0]], id_list[1:])
-    else:
-        nested[id_list[0]] = value
-
-def isPureList(l):
-    """
-    Check if a list is not a nested one
-    """
-    for e in l:
-        if isinstance(e, list):
-            return False
-    return True
-
-def code2indslist(code):
-    """
-    Turn a code into the reference indexes of a nested list
-        Eg. [2,1,2,1] -> [0,1,0]
-        the first number is the ident code of the layer type
-    """
-    return [d-1 for d in code[1:]]
-
-def flattenNested(nested):
-    """
-    Flatten a nested list
-        support two-level nested, with number mixed
-        Eg. [3,[1,2,3],5,[2,4]]
-    """
-    flatten = []
-    for l in nested:
-        if isinstance(l, list):
-            assert(isPureList(l))
-            flatten.extend([e for e in l])
-        else:
-            flatten.append(l)
-    return flatten
-
-
-def extractLeaf(feat, depth, concat=[], level=0):
-    """
-    Extract the leaf lists in the same level in a nested list
-    """
-    level += 1
-    # print('  ', level, depth, concat)
-    for i, e in enumerate(feat):
-        if isinstance(e, list):
-            if isPureList(e):
-                # lowest level only
-                if level == depth - 1:
-                    concat.extend(e)
-                    feat[i] = sum(e)
-            else:
-                feat[i], concat = extractLeaf(e, depth, concat, level)
-    return feat, concat
-
 
 def oneHotStructEncode(feat):
     """
@@ -246,6 +173,7 @@ def getNestedKeyWithCode(obj, code):
 def image2feature_old(layer_names):
     """
     One-hot encode the names of layers. Leaf one-hotting
+        **Deprecated**
     """
 
     features = []
@@ -295,30 +223,34 @@ def image2feature_old(layer_names):
     # print(features)
     return flattenNested(features)
 
-def getFeatureWithCode(dic, code=None):
-    keywords = []
-    if code:
-        keywords = getNestedKeyWithCode(dic, code)
-    all_keywords = getNestedKey(dic)
+def keyword2feature(keywords):
+    """
+    Convert category keywords to one-hot features
+    """
+    all_keywords = getNestedKey(surrouding_dict) + getNestedKey(person_dict)
     return [1 if k in keywords else 0 for k in all_keywords]
 
-def getFeatureSimiWithCode(dic, sent, code=None):
-    keywords = []
-    if code:
-        keywords = getNestedKeyWithCode(dic, code)
-    all_keywords = getNestedKey(dic)
-    return [maxSentSimi(sent, k) if k in keywords else 0 for k in all_keywords]
+def layer2keyword(layer_names):
+    """
+    convert layer names to category keywords, but lose the occlusion info
+        Person and surrounding only
+    """
+    codes = [name2code(name) for name in layer_names]
+    cat_codes = [code[0] for code in codes] # get head category
 
-def getFeatureWithLayer():
-    """
-    summarize the layer2code stuff, which head category can be infered from the head code
-    """
-    pass
+    keywords = []
+    for c, dic in zip([2, 3], [surrouding_dict, person_dict]):
+        if c in cat_codes:
+            subcode = codes[cat_codes.index(c)][1:]
+            keywords.extend(getNestedKeyWithCode(dic, subcode))
+    return keywords
 
 def image2feature(layer_names):
     """
     One-hot encode the names of layers
     Get all the keywords recursively
+
+    Caveats: cannot use keywords as inputs here, because keywords carry no occlusion information
     """
 
     features = []
@@ -335,60 +267,21 @@ def image2feature(layer_names):
         feat_layer[code[0] - 1] = 1
     features.append(feat_layer)
 
-    ## todo - summarize this stuff
+    # occlusion, person in front of surrounding, or otherwise
+    cat_codes = [code[0] for code in codes]
+    if 2 in cat_codes and 3 in cat_codes:
+        if cat_codes.index(2) < cat_codes.index(3):
+            # person in the front
+            features.append([1,0])
+        else:
+            # surrounding in the front
+            features.append([0,1])
+    else:
+        features.append([0,0])
+
     # sub-categories, keyword exists - binary
     ## In fact: one-hot in each level, ensured by the codes
-    cat_codes = [code[0] for code in codes]
-    for c, dic in zip([2, 3], [surrouding_dict, person_dict]):
-        if c in cat_codes:
-            subcode = codes[cat_codes.index(c)][1:]
-        else:
-            subcode = None
-        features.append(getFeatureWithCode(dic, subcode))
+    features.append(keyword2feature(layer2keyword(layer_names)))
 
     return flattenNested(features)
 
-def image2SimiFeature(layer_names, sentence):
-    assert(isinstance(layer_names, list))
-    assert(isinstance(layer_names[0], str))
-    assert(isinstance(sentence, list))
-    assert(isinstance(sentence[0], str))
-
-    features = []
-    # sub-categories, keyword simi
-    codes = [name2code(name) for name in layer_names]
-    cat_codes = [code[0] for code in codes]
-    for c, dic in zip([2, 3], [surrouding_dict, person_dict]):
-        if c in cat_codes:
-            subcode = codes[cat_codes.index(c)][1:]
-        else:
-            subcode = None
-        features.append(getFeatureSimiWithCode(dic, sentence, subcode))
-
-    return flattenNested(features)
-
-def getCrossSimiWithCode(dic, sent, vocab, code=None):
-    keywords = []
-    if code:
-        keywords = getNestedKeyWithCode(dic, code)
-    all_keywords = getNestedKey(dic)
-    return [sentSimi(sent, k, vocab) if k in keywords else sentSimi(sent, None, vocab) for k in all_keywords]
-
-def getCrossSimi(layer_names, sentence, vocab):
-    assert(isinstance(layer_names, list))
-    assert(isinstance(layer_names[0], str))
-    assert(isinstance(sentence, list))
-    assert(isinstance(sentence[0], str))
-
-    features = []
-    # sub-categories, keyword simi
-    codes = [name2code(name) for name in layer_names]
-    cat_codes = [code[0] for code in codes]
-    for c, dic in zip([2, 3], [surrouding_dict, person_dict]):
-        if c in cat_codes:
-            subcode = codes[cat_codes.index(c)][1:]
-        else:
-            subcode = None
-        features.append(sparse.csr_matrix(getCrossSimiWithCode(dic, sentence, vocab, subcode)))
-
-    return sparse.vstack(features) # flattenNested(features)
