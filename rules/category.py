@@ -3,7 +3,7 @@
 ### pre-defined categories
 # from collections import defaultdict
 surrouding_dict = dict()
-surrouding_dict['indoor'] = {'concrete': ['furniture', 'appliance', 'wall', 'other'], 'abstract': ['chart', 'art']}
+surrouding_dict['indoor'] = {'concrete': ['furniture', 'appliance', 'wall', 'ornament'], 'abstract': ['chart', 'art']}
 surrouding_dict['outdoor'] = {'city': ['street', 'building', 'vehicle'], 'field':['park', 'nature']}
 # print(surrouding_dict)
 

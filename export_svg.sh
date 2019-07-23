@@ -12,8 +12,8 @@ if [ -z "$1" ];then
 fi
 
 pattern='^A' # identification number of a valid layer
-imageDir="images"
 fileName=$1
+imageDir=$2 #"images"
 baseName=${fileName%.*}
 echo $baseName
 exDirName="m_$baseName"
@@ -27,3 +27,5 @@ fi
 
 ../svg-objects-export/svg-objects-export.py $(pwd)/$fileName -d $(pwd)/$exDirName/ --pattern $pattern --extra " --export-id-only" --prefix ''
 cd ..
+
+## todo - export all person objects to its normal size

@@ -7,6 +7,7 @@ import glob
 import re
 from itertools import count
 from rules.category import person_dict, surrouding_dict
+from tools.text_process import maxSentSimi
 
 ### Get layer names give the .svg file
 def getLayerNames(file):
@@ -25,7 +26,10 @@ def getLayerNames(file):
     #              g.hasAttribute('id')]
     layers = [g for g in doc.getElementsByTagName('g') \
               if g.nodeType == 1 and \
-                 g.hasAttribute('id')]
+                 g.hasAttribute('id') and g.getAttribute('id').startswith('A')]
+
+    ## todo - clean marks like _x3_  and find names subject to pattern
+    ### like what we do in the following
     if layers:
         for layer in layers[1:]:
             assert(layer in layers[0].parentNode.childNodes), 'Ids not at the same level!'
@@ -298,7 +302,6 @@ def getFeatureWithCode(dic, code=None):
     return [1 if k in keywords else 0 for k in all_keywords]
 
 def getFeatureSimiWithCode(dic, sent, code=None):
-    from tools.text_process import maxSentSimi
     keywords = []
     if code:
         keywords = getNestedKeyWithCode(dic, code)
