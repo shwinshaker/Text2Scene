@@ -2,8 +2,6 @@
 from nltk.corpus import wordnet as wn
 from nltk.corpus.reader.wordnet import WordNetError
 from scipy import sparse
-from tools.image_process import getNestedKey, getNestedKeyWithCode, name2code
-from rules.category import person_dict, surrouding_dict
 from tools.common import flattenNested
 
 ### joint text and keywords processing
@@ -45,7 +43,6 @@ def keywordSimi(sentence, keywords):
     """
     return [maxSentSimi(sentence, k) for k in keywords]
 
-
 def sentSimi(sent, keyword, vocab):
     """
     Given a vocab, compute the similarity of each token in it with a keyword
@@ -55,70 +52,27 @@ def sentSimi(sent, keyword, vocab):
     return [wrapRelaxedSimi(t, keyword) if t in sent else 0 for t in vocab]
 
 
-def getFeatureSimiWithCode(dic, sent, code=None):
-    """
-    Get the max similarity of a sentence with each keyword
-        given the sub-category code
-        **Deprecated**
-    """
-    keywords = []
-    if code:
-        keywords = getNestedKeyWithCode(dic, code)
-    all_keywords = getNestedKey(dic)
-    return [maxSentSimi(sent, k) if k in keywords else 0 for k in all_keywords]
+class SimiEncoder():
+    def __init__(self, img_encoder, txt_encoder):
+        self.img_encoder = img_encoder
+        self.txt_encoder = txt_encoder
+
+        # set features
+        ### be extremely careful here for the order of feature names
+        self.features_ = []
+        self.features_.extend(['_S_%s_%s_' % (k, t) for k in img_encoder.srd_categ for t in txt_encoder.vocab_])
+        self.features_.extend(['_P_%s_%s_' % (k, t) for k in img_encoder.prs_categ for t in txt_encoder.vocab_])
+
+    def encode(self, layer_names, sentence):
+        assert(isinstance(layer_names, list))
+        assert(isinstance(layer_names[0], str))
+        assert(layer_names[0].startswith('A'))
+        assert(isinstance(sentence, str))
+
+        keywords = self.img_encoder.layer2keyword(layer_names)
+        tokens = self.txt_encoder.tokenizer(sentence)
+        return flattenNested([sentSimi(tokens, k, self.txt_encoder.vocab_) if k in keywords else sentSimi(tokens, None, self.txt_encoder.vocab_) for k in self.img_encoder.category_])
 
 
-def image2SimiFeature(layer_names, sentence):
-    """
-    Get the max similarity of a sentence with each keyword as joint feature
-        **Deprecated**
-    """
-    assert(isinstance(layer_names, list))
-    assert(isinstance(layer_names[0], str))
-    assert(isinstance(sentence, list))
-    assert(isinstance(sentence[0], str))
 
-    features = []
-    # sub-categories, keyword simi
-    codes = [name2code(name) for name in layer_names]
-    cat_codes = [code[0] for code in codes]
-    for c, dic in zip([2, 3], [surrouding_dict, person_dict]):
-        if c in cat_codes:
-            subcode = codes[cat_codes.index(c)][1:]
-        else:
-            subcode = None
-        features.append(getFeatureSimiWithCode(dic, sentence, subcode))
 
-    return flattenNested(features)
-
-def getCrossSimiWithCode(dic, sent, vocab, code=None):
-    """
-    Get the cross similarities between each category keyword and each word in the vocabulary, given the subcode
-    """
-    keywords = []
-    if code:
-        keywords = getNestedKeyWithCode(dic, code)
-    all_keywords = getNestedKey(dic)
-    return [sentSimi(sent, k, vocab) if k in keywords else sentSimi(sent, None, vocab) for k in all_keywords]
-
-def getCrossSimi(layer_names, sentence, vocab):
-    """
-    Get the cross similarities between each category keyword and each word in the vocabulary as the joint features
-    """
-    assert(isinstance(layer_names, list))
-    assert(isinstance(layer_names[0], str))
-    assert(isinstance(sentence, list))
-    assert(isinstance(sentence[0], str))
-
-    features = []
-    # sub-categories, keyword simi
-    codes = [name2code(name) for name in layer_names]
-    cat_codes = [code[0] for code in codes]
-    for c, dic in zip([2, 3], [surrouding_dict, person_dict]):
-        if c in cat_codes:
-            subcode = codes[cat_codes.index(c)][1:]
-        else:
-            subcode = None
-        features.append(sparse.csr_matrix(getCrossSimiWithCode(dic, sentence, vocab, subcode)))
-
-    return sparse.vstack(features) # flattenNested(features)

@@ -8,6 +8,7 @@ import re
 from itertools import count
 from rules.category import person_dict, surrouding_dict
 from tools.common import flattenNested, extractLeaf, getDepth
+from tools.common import getNestedKey, getNestedKeyWithCode
 
 ### Get layer names give the .svg file
 def getLayerNames(file):
@@ -100,188 +101,79 @@ def checkLayerNames(names):
 
 
 ### From layer name to image features
+class CategEncoder():
+    def __init__(self):
 
-def oneHotStructEncode(feat):
-    """
-    Given the nested features,
-        encode each category level into one-hot
-    """
-    concats = []
-    while not isPureList(feat):
-        feat, concat = extractLeaf(feat,
-                                   getDepth(feat),
-                                   concat=[],
-                                   level=0)
-        # print(feat, concat)
-        concats.append(concat)
-    concats.append(feat)
-    return flattenNested(concats[::-1])
+        # get feature names
+        self.features_ = []
+        self.features_.append('_NLayers_')
+        self.features_.extend(['_Background_',
+                               '_Surroundings_',
+                               '_Person_',
+                               '_Decoration_',
+                               '_Person_front_',
+                               '_Surrounding_front_'])
 
-def getNestedKey(obj):
-    """
-    recursion wrapper
-    """
-    keys = []
-    getNestedKey_(obj, keys=keys)
-    return keys
+        # categorical features
+        self.srd_categ = getNestedKey(surrouding_dict)
+        self.prs_categ = getNestedKey(person_dict)
+        self.category_ = self.srd_categ + self.prs_categ
+        self.features_.extend(['_S_%s_' % k for k in self.srd_categ])
+        self.features_.extend(['_P_%s_' % k for k in self.prs_categ])
 
-def getNestedKey_(obj, keys=[]):
-    """
-    get all the keys in a nested dictionary
-        todo - keys argument can be saved if use reference
-    """
-    if isinstance(obj, dict):
-        for key in obj:
-            keys.append(key)
-            getNestedKey_(obj[key], keys)
-    elif isinstance(obj, list):
-        for key in obj:
-            getNestedKey_(key, keys)
-    elif isinstance(obj, str):
-        keys.append(obj)
-    else:
-        raise KeyError
+    def encode(self, layer_names):
 
-def getNestedKeyWithCode(obj, code):
-    keys = []
-    for c in code:
-        if isinstance(obj, dict):
-            key = list(obj.keys())[c - 1]
-            keys.append(key)
-            obj = obj[key]
-        elif isinstance(obj, list):
-            l = []
-            for key in obj:
-                if isinstance(key, str):
-                    l.append(key)
-                elif isinstance(key, dict):
-                    l.extend(list(key.keys()))
-                else:
-                    raise TypeError('Invalid type other than str and dict')
-            key = l[c - 1]
-            keys.append(key)
-            if key in obj:
-                obj = key # should end here
+        features = []
+        # number of layers
+        features.append(len(layer_names))
+
+        # convert to digit codes first
+        codes = [name2code(name) for name in layer_names]
+
+        # four types of layers, binary
+        feat_layer = [0] * 4
+        for code in codes:
+            feat_layer[code[0] - 1] = 1
+        features.append(feat_layer)
+
+        # occlusion, person in front of surrounding, or otherwise
+        cat_codes = [code[0] for code in codes]
+        if 2 in cat_codes and 3 in cat_codes:
+            if cat_codes.index(2) < cat_codes.index(3):
+                # person in the front
+                features.append([1,0])
             else:
-                for obj_ in obj:
-                    if isinstance(obj_, dict) and key in obj_.keys():
-                        obj = obj_[key]
+                # surrounding in the front
+                features.append([0,1])
         else:
-            raise TypeError('Invalid type other than str and dict. Could be incorrect query code!')
-    return keys
+            features.append([0,0])
 
-def image2feature_old(layer_names):
-    """
-    One-hot encode the names of layers. Leaf one-hotting
-        **Deprecated**
-    """
+        # sub-categories, keyword exists - binary
+        ## In fact: one-hot in each level, ensured by the codes
+        features.append(self.keyword2feature(self.layer2keyword(layer_names)))
 
-    features = []
+        return flattenNested(features)
 
-    # number of layers
-    features.append(len(layer_names))
+    def keyword2feature(self, keywords):
+        """
+        Convert category keywords to one-hot features
+        """
+        return [1 if k in keywords else 0 for k in self.category_]
 
-    # convert to digit codes first
-    codes = [name2code(name) for name in layer_names]
+    def layer2keyword(self, layer_names):
+        """
+        convert layer names to category keywords, but lose the occlusion info
+            Person and surrounding only
+        """
+        codes = [name2code(name) for name in layer_names]
+        cat_codes = [code[0] for code in codes] # get head category
 
-    # four layer type, binary
-    feat_layer = [0] * 4
-    for code in codes:
-        feat_layer[code[0] - 1] = 1
-    features.append(feat_layer)
+        keywords = []
+        for c, dic in zip([2, 3], [surrouding_dict, person_dict]):
+            if c in cat_codes:
+                subcode = codes[cat_codes.index(c)][1:]
+                keywords.extend(getNestedKeyWithCode(dic, subcode))
+        return keywords
 
-    # sub-categories - one-hot for each level
-    # get surrounding and person code, if any
-    code_srd = None
-    code_prs = None
-    for code in codes:
-        if code[0] == 1 or code[0] == 4:
-            # background or decoration, no need to encode
-            assert(len(code) == 1)
-        elif code[0] == 2:
-            # surrounding
-            code_srd = code
-        elif code[0] == 3:
-            code_prs = code
-        else:
-            raise ValueError('Invalid layer type code!')
 
-    # surrounding(2) template
-    # feat = [[0,[0,0,0]],[0,[0,0,0],[0,0]]]
-    feat = [[[0,0,0,0],[0,0]],[[0,0,0],[0,0]]]
-    if code_srd:
-        recurReplace(feat, code2indslist(code_srd))
-    features.append(oneHotStructEncode(feat))
-
-    # person(3) template
-    # feat = [0,[0,0,0],[0,0,0,0]]
-    feat = [[0,0,0,0,0,0],[[0,0,0],0,0,0,0]]
-    if code_prs:
-        recurReplace(feat, code2indslist(code_prs))
-    features.append(oneHotStructEncode(feat))
-
-    # print(features)
-    return flattenNested(features)
-
-def keyword2feature(keywords):
-    """
-    Convert category keywords to one-hot features
-    """
-    all_keywords = getNestedKey(surrouding_dict) + getNestedKey(person_dict)
-    return [1 if k in keywords else 0 for k in all_keywords]
-
-def layer2keyword(layer_names):
-    """
-    convert layer names to category keywords, but lose the occlusion info
-        Person and surrounding only
-    """
-    codes = [name2code(name) for name in layer_names]
-    cat_codes = [code[0] for code in codes] # get head category
-
-    keywords = []
-    for c, dic in zip([2, 3], [surrouding_dict, person_dict]):
-        if c in cat_codes:
-            subcode = codes[cat_codes.index(c)][1:]
-            keywords.extend(getNestedKeyWithCode(dic, subcode))
-    return keywords
-
-def image2feature(layer_names):
-    """
-    One-hot encode the names of layers
-    Get all the keywords recursively
-
-    Caveats: cannot use keywords as inputs here, because keywords carry no occlusion information
-    """
-
-    features = []
-
-    # number of layers
-    features.append(len(layer_names))
-
-    # convert to digit codes first
-    codes = [name2code(name) for name in layer_names]
-
-    # four layer type, binary
-    feat_layer = [0] * 4
-    for code in codes:
-        feat_layer[code[0] - 1] = 1
-    features.append(feat_layer)
-
-    # occlusion, person in front of surrounding, or otherwise
-    cat_codes = [code[0] for code in codes]
-    if 2 in cat_codes and 3 in cat_codes:
-        if cat_codes.index(2) < cat_codes.index(3):
-            # person in the front
-            features.append([1,0])
-        else:
-            # surrounding in the front
-            features.append([0,1])
-    else:
-        features.append([0,0])
-
-    # sub-categories, keyword exists - binary
-    ## In fact: one-hot in each level, ensured by the codes
-    features.append(keyword2feature(layer2keyword(layer_names)))
-
-    return flattenNested(features)
 
