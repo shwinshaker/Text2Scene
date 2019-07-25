@@ -1,10 +1,19 @@
 #!./env python
 
 ### pre-defined categories
+
 # from collections import defaultdict
 surrouding_dict = dict()
 # surrouding_dict['indoor'] = {'concrete': ['furniture', 'appliance', 'wall', 'ornament'], 'abstract': ['chart', 'art']}
 # surrouding_dict['outdoor'] = {'city': ['street', 'building', 'vehicle'], 'field':['park', 'nature']}
+
+## should we use explicit meaning of the words or use the max to let it more flexible?
+# Counterexample:
+#   wn.lch_similarity(wn.synset('stand.v.01'), wn.synset('stand.n.02'))
+#       returns 0
+#       because POS is different
+#       But they are actually similar
+#
 surrouding_dict['indoor.a.01'] = {'object.n.01': ['furniture.n.01',
                                                   'appliance.n.02',
                                                   'wall.n.01',
