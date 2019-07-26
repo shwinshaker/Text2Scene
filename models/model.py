@@ -1,35 +1,34 @@
 #!./env python
+
 import numpy as np
 import glob
 import random
 from scipy import sparse
 
-from tools.text_process import LemmaTokenizer
-from tools.image_process import getLayerNames, checkLayerNames, image2feature
-from models.vectorizer import getVectorizer
-
-# Similarity between category keywords and the description
-# suppress cats not in image??**
-from tools.image_process import image2SimiFeature
+from tools.text_process import TfidfEncoder
+from tools.image_process import getLayerNames, CategEncoder
+from tools.joint_process import SimiEncoder
 
 # random image generator, subject to rules
 from tools.generator import ranGenLayer
 
 class Dataset():
-    """
-    **Deprecated**
-    use max sentence Similarity as feature --> not intepretable
-    """
     def __init__(self, img_dir='images', txt_dir='text'):
         self.img_dir = img_dir
         self.txt_dir = txt_dir
-        self.tokenizer = LemmaTokenizer()
-        # this operation will process all the text and train a vectorizer
+
+        # fitting the vectorizer will process all the text
         # so we have double processed the text here
-        self.vectorizer = getVectorizer()
+        self.img_encoder = CategEncoder()
+        self.txt_encoder = TfidfEncoder()
+        self.joint_encoder = SimiEncoder(self.img_encoder,
+                                         self.txt_encoder)
 
         # set features
-        self.__get_featureNames()
+        self.features_ = []
+        self.features_.extend(self.txt_encoder.vocab_)
+        self.features_.extend(self.img_encoder.features_)
+        self.features_.extend(self.joint_encoder.features_)
 
     def getOneLayerSent(self, txt_name=None, img_name=None,
                               ran_txt=False, ran_img=False,
@@ -45,8 +44,7 @@ class Dataset():
             assert(txt_name)
 
         with open(txt_name, 'r') as f:
-            orig_sent = f.read()
-            sent = self.tokenizer(orig_sent)
+            sent = f.read()
 
         ## image
         if ran_img:
@@ -65,14 +63,16 @@ class Dataset():
 
         return layers, sent
 
-    def __getEmbed(self, **kwargs):
+    def encode(self, layers=None, sent=None, **kwargs):
+        assert((layers and sent) or (not layers and not sent)), 'layers and sentence must be provided together, or neither'
 
-        layers, sent = self.getOneLayerSent(**kwargs)
+        if not layers and not sent:
+            layers, sent = self.getOneLayerSent(**kwargs)
 
         # tofeature
-        txt_embed = self.vectorizer.transform([sent]).toarray()[0]
-        img_embed = image2feature(layers)
-        joint_embed = image2SimiFeature(layers, sent)
+        txt_embed = self.txt_encoder.encode(sent)
+        img_embed = self.img_encoder.encode(layers)
+        joint_embed = self.joint_encoder.encode(layers, sent)
 
         return np.hstack([txt_embed, img_embed, joint_embed])
 
@@ -83,24 +83,25 @@ class Dataset():
         # triplets
         triplets = []
         # true match
-        triplets.append(self.__getEmbed(txt_name=txt_name,
-                                        img_name=img_name))
-        # fake image
-        triplets.append(self.__getEmbed(txt_name=txt_name,
-                                        fake_img=True))
+        triplets.append(self.encode(txt_name=txt_name,
+                                    img_name=img_name))
+#         # fake image
+#         triplets.append(self.encode(txt_name=txt_name,
+#                                     fake_img=True))
         # mismatched text
-        triplets.append(self.__getEmbed(img_name=img_name,
-                                        txt_name=txt_name,
-                                        ran_txt=True))
+        triplets.append(self.encode(img_name=img_name,
+                                    txt_name=txt_name,
+                                    ran_txt=True))
         # mismatched image
-        triplets.append(self.__getEmbed(img_name=img_name,
-                                        txt_name=txt_name,
-                                        ran_img=True))
+        triplets.append(self.encode(img_name=img_name,
+                                    txt_name=txt_name,
+                                    ran_img=True))
 
         xs = np.vstack(triplets)
 
         # ys
-        ys = np.array([1,0,0,0]).reshape(-1,1)
+        # ys = np.array([1,0,0,0]).reshape(-1,1)
+        ys = np.array([1,0,0]).reshape(-1,1)
 
         return sparse.csr_matrix(np.hstack([xs, ys]))
 
@@ -108,26 +109,4 @@ class Dataset():
     def __len__(self):
         return len(glob.glob(self.img_dir+'/*.svg'))
 
-    def __get_featureNames(self):
-        self.features_ = []
-        # text features
-        self.vocab_, _ = zip(*sorted(self.vectorizer.vocabulary_.items(),
-                                     key=lambda x:x[::-1]))
-        self.features_.extend(list(self.vocab_))
 
-        # image features
-        from tools.image_process import getNestedKey
-        from rules.category import surrouding_dict, person_dict
-        self.features_.append('_NLayers_')
-        self.features_.extend(['_Background_',
-                               '_Surroundings_',
-                               '_Person_',
-                               '_Decoration_'])
-        srd_keys = getNestedKey(surrouding_dict)
-        prs_keys = getNestedKey(person_dict)
-        self.features_.extend(['_S_%s_' % k for k in srd_keys])
-        self.features_.extend(['_P_%s_' % k for k in prs_keys])
-
-        # joint features
-        self.features_.extend(['_simi_S_%s_' % k for k in srd_keys])
-        self.features_.extend(['_simi_P_%s_' % k for k in prs_keys])

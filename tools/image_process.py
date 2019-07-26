@@ -40,7 +40,7 @@ def getLayerNames(file):
                 f_layers.append(layer)
             else:
                 warnings.warn('In file %s layer %s not at the same level with the first layer! Skip it!' % (file, layer.getAttribute('id')))
-        return [l.getAttribute('id') for l in f_layers]
+        return [cleanName(l.getAttribute('id')) for l in f_layers]
     else:
         if svg.hasAttribute('id'):
             # if single layer case, id belongs to <svg>
@@ -48,7 +48,7 @@ def getLayerNames(file):
             assert(len([g for g in svg.childNodes \
                           if g.nodeType == 1 and \
                              g.tagName == 'g']) <= 1)
-            return [svg.getAttribute('id')]
+            return [cleanName(svg.getAttribute('id'))]
         else:
             raise ValueError('No valid id name found!')
 
@@ -182,4 +182,98 @@ class CategEncoder():
         return keywords
 
 
+### Image synthesis
+def str2num_size(size):
+    """
+    Convert a size string into a digit
+    Eg. 12pt -> 12
+    """
+    assert type(size) is str
+    return int(float(size.strip('pt')))
 
+def get_size(file):
+    """
+    Get the width and height of an image
+
+    .svg:
+        use xml's parse
+        By check the 'viewBox' attribute in the 'svg' tag
+
+    .png:
+        use PIL
+    """
+
+    basename, ext = os.path.splitext(file)
+    if ext == '.svg':
+        from xml.dom.minidom import parse
+        doc = parse(file)
+        # search svg element
+        image_list = doc.getElementsByTagName('svg')
+        assert(image_list), 'no svg element found!'
+        assert(len(image_list) == 1), file
+        img = image_list[0]
+        assert(img.hasAttribute('viewBox'))
+        width, height = img.getAttribute('viewBox').split()[2:]
+        width, height = (str2num_size(width), str2num_size(height))
+        # try search image element, then g element
+#     try:
+#         assert image_list
+#     except AssertionError:
+#         image_list = doc.getElementsByTagName('svg')
+#         assert image_list
+#         assert image_list[0].hasAttribute('width')
+#     assert(len(image_list) == 1), svg_file
+#     ## if multiple images, size is the maximum size in either direction
+    elif ext == '.png':
+        from PIL import Image
+        width, height = Image.open(file).size
+
+    return (width, height)
+
+def stack_svgs(file_list, opt_file=None, canvas_size=None):
+    """
+    Stack materials into a .svg image
+        Support .png material only
+    """
+
+    import cairosvg
+    from svgutils.compose import Figure, Image #,SVG
+
+    if not opt_file:
+        opt_file = 'stack.svg'
+
+    if canvas_size:
+        canvas_w, canvas_h = canvas_size
+    else:
+        canvas_w, canvas_h = 0, 0
+        for file in file_list:
+            width, height = get_size(file)
+            if width > canvas_w: canvas_w = width
+            if height > canvas_h: canvas_h = height
+    print('Canvas size:', (canvas_w, canvas_h))
+
+    # if svg, convert to png first
+    file_list_png = []
+    for file in file_list:
+        basename, ext = os.path.splitext(file)
+        if ext == '.svg':
+            png_file = basename + '.png'
+            cairosvg.svg2png(url=file,
+                             write_to=png_file)
+            file_list_png.append(png_file)
+        elif ext == '.png':
+            file_list_png.append(file)
+        else:
+            raise ValueError('File type not availale!')
+
+    image_list = []
+    #
+    for file in file_list_png:
+        print('File:', file)
+        width, height = get_size(file)
+        img = Image(width, height, file)
+        img.move(int((canvas_w-width)/2),
+                 int((canvas_h-height)/2))
+        image_list.append(img)
+
+    Figure(canvas_w, canvas_h, *image_list).save(opt_file)
