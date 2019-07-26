@@ -5,10 +5,10 @@ import os
 import numpy as np
 import glob
 import re
-from itertools import count
 from rules.category import person_dict, surrouding_dict
 from tools.common import flattenNested, extractLeaf, getDepth
 from tools.common import getNestedKey, getNestedKeyWithCode
+import warnings
 
 ### Get layer names give the .svg file
 def getLayerNames(file):
@@ -32,9 +32,15 @@ def getLayerNames(file):
     ## todo - clean marks like _x3_  and find names subject to pattern
     ### like what we do in the following
     if layers:
+        ## only find those layers at the same level
+        f_layers = [layers[0]]
         for layer in layers[1:]:
-            assert(layer in layers[0].parentNode.childNodes), 'Ids not at the same level!'
-        return [l.getAttribute('id') for l in layers]
+            # assert(layer in layers[0].parentNode.childNodes), ('Ids not at the same level!: %s' % file, layers)
+            if layer in layers[0].parentNode.childNodes:
+                f_layers.append(layer)
+            else:
+                warnings.warn('In file %s layer %s not at the same level with the first layer! Skip it!' % (file, layer.getAttribute('id')))
+        return [l.getAttribute('id') for l in f_layers]
     else:
         if svg.hasAttribute('id'):
             # if single layer case, id belongs to <svg>
@@ -89,9 +95,9 @@ def checkLayerNames(names):
     ## one of surrounding or person should be in the scene
     assert(2 in cat_codes or 3 in cat_codes), 'Neither person nor surroundings are found in the scene!'
 
-    # if only one layer, must be surrounding layer
-    if len(cat_codes) == 1:
-        assert(cat_codes[0] == 2), 'it must be the surrounding layer if there is only one layer'
+    # # if only one layer, must be surrounding layer
+    # if len(cat_codes) == 1:
+    #     assert(cat_codes[0] == 2), 'it must be the surrounding layer if there is only one layer'
     # else: ## not necessarily
     #     # if multiple layers, check the cat order
     #     # background 1 - surroundings 2 - person 3 - decoration 4
@@ -111,8 +117,8 @@ class CategEncoder():
                                '_Surroundings_',
                                '_Person_',
                                '_Decoration_',
-                               '_Person_front_',
-                               '_Surrounding_front_'])
+                               '_P_in_front_of_S_',
+                               '_S_in_front_of_P_'])
 
         # categorical features
         self.srd_categ = getNestedKey(surrouding_dict)

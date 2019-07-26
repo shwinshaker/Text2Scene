@@ -4,6 +4,7 @@ import random
 from tools.image_process import checkLayerNames
 from rules.category import surrouding_dict, person_dict
 
+### random generator
 def ranGenCatCode():
     """
     Randomly generate a set of legal category codes
@@ -77,3 +78,74 @@ def ranGenLayer():
         else:
             raise KeyError('Invalid code %i!' % c )
     return layers
+
+
+from tools.common import getAllKeyCombsFromNested, keyword2Code, packAppend
+### exhaustive generator
+def getAllHeadLayersCode():
+    """
+    Get all possible head code combinations
+    Eg. [[0,1,0,0], [0,0,1,0], ...]
+    """
+    SP = [[s, p] for s in [1,0] for p in [1,0]]
+    SP.remove([0,0]) # person or surrounding, must have one
+    BD = [[b, d] for b in [1,0] for d in [1,0]]
+    return [[bd[0]] + sp + [bd[1]] for sp in SP for bd in BD]
+
+def expandCategory(layers_code):
+    """
+    Expand a layer code by all possible combinations of category subcodes
+    """
+
+    def _getAllSubcode(dic):
+        """
+        Get all possible subcodes of a nested dictionary
+        """
+        return [keyword2Code(dic, keys) for keys in getAllKeyCombsFromNested(dic)]
+
+    def _code2Layer(head, codes):
+        """
+        Given head category's code and subcodes, output layer name
+        Eg. 2, [1,1,1] -> 'A2111'
+        """
+        return 'A' + str(head) + ''.join([str(c) for c in codes])
+
+
+    # get existing head codes based on the binary code
+    head_codes = [i+1 for i,v in enumerate(layers_code) if v == 1]
+
+    # get all subcodes combinations
+    subcodes_srd = _getAllSubcode(surrouding_dict)
+    subcodes_prs = _getAllSubcode(person_dict)
+
+    # expand headcode based on possible subcodes
+    if 1 in head_codes:
+        layers_0 = [['A1']]
+    else:
+        layers_0 = [[]]
+
+    if 2 in head_codes:
+        layers = packAppend(layers_0, [_code2Layer(2, c) for c in subcodes_srd])
+        if 3 in head_codes:
+            layers_23 = packAppend(layers, [_code2Layer(3, c) for c in subcodes_prs])
+            # reverse the order
+            layers_32 = packAppend(layers_0, [_code2Layer(3, c) for c in subcodes_prs])
+            layers_32 = packAppend(layers_32, [_code2Layer(2, c) for c in subcodes_srd])
+            layers = layers_23 + layers_32
+    else:
+        assert 3 in head_codes
+        layers = packAppend(layers_0, [_code2Layer(3, c) for c in subcodes_prs])
+
+    if 4 in head_codes:
+        layers = packAppend(layers, ['A4'])
+    return layers
+
+def getAllLayerCombs():
+    """
+    Get all possible layer combinations
+    Eg. [['A1','A2111'],['A1','A311'],['A1','A2111','A311'],...]
+    """
+    all_layers = []
+    for layers in getAllHeadLayersCode():
+        all_layers.extend(expandCategory(layers))
+    return all_layers
