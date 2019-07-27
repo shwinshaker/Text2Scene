@@ -120,21 +120,33 @@ def expandCategory(layers_code):
 
     # expand headcode based on possible subcodes
     if 1 in head_codes:
-        layers_0 = [['A1']]
+        # layers_0 = [['A1']]
+        layers = [['A1']]
     else:
-        layers_0 = [[]]
+        # layers_0 = [[]]
+        layers = [[]]
 
+    """
+    Let's resolve the occlusion tentatively. This feature seems not quite useful.
+    """
     if 2 in head_codes:
-        layers = packAppend(layers_0, [_code2Layer(2, c) for c in subcodes_srd])
-        if 3 in head_codes:
-            layers_23 = packAppend(layers, [_code2Layer(3, c) for c in subcodes_prs])
-            # reverse the order
-            layers_32 = packAppend(layers_0, [_code2Layer(3, c) for c in subcodes_prs])
-            layers_32 = packAppend(layers_32, [_code2Layer(2, c) for c in subcodes_srd])
-            layers = layers_23 + layers_32
-    else:
-        assert 3 in head_codes
-        layers = packAppend(layers_0, [_code2Layer(3, c) for c in subcodes_prs])
+        # layers = packAppend(layers_0, [_code2Layer(2, c) for c in subcodes_srd])
+        layers = packAppend(layers, [_code2Layer(2, c) for c in subcodes_srd])
+
+    if 3 in head_codes:
+        layers = packAppend(layers, [_code2Layer(3, c) for c in subcodes_prs])
+
+    # if 2 in head_codes:
+    #     layers = packAppend(layers_0, [_code2Layer(2, c) for c in subcodes_srd])
+    #     if 3 in head_codes:
+    #         layers_23 = packAppend(layers, [_code2Layer(3, c) for c in subcodes_prs])
+    #         # reverse the order
+    #         layers_32 = packAppend(layers_0, [_code2Layer(3, c) for c in subcodes_prs])
+    #         layers_32 = packAppend(layers_32, [_code2Layer(2, c) for c in subcodes_srd])
+    #         layers = layers_23 + layers_32
+    # else:
+    #     assert 3 in head_codes
+    #     layers = packAppend(layers_0, [_code2Layer(3, c) for c in subcodes_prs])
 
     if 4 in head_codes:
         layers = packAppend(layers, ['A4'])

@@ -8,6 +8,7 @@ import re
 from rules.category import person_dict, surrouding_dict
 from tools.common import flattenNested, extractLeaf, getDepth
 from tools.common import getNestedKey, getNestedKeyWithCode
+from tools.joint_process import wrapRelaxedSimi
 import warnings
 
 ### Get layer names give the .svg file
@@ -40,7 +41,7 @@ def getLayerNames(file):
                 f_layers.append(layer)
             else:
                 warnings.warn('In file %s layer %s not at the same level with the first layer! Skip it!' % (file, layer.getAttribute('id')))
-        return [cleanName(l.getAttribute('id')) for l in f_layers]
+        return rectifyLayer(file, [cleanName(l.getAttribute('id')) for l in f_layers])
     else:
         if svg.hasAttribute('id'):
             # if single layer case, id belongs to <svg>
@@ -52,6 +53,27 @@ def getLayerNames(file):
         else:
             raise ValueError('No valid id name found!')
 
+def rectifyLayer(file, layers):
+    """
+    move A4 to the top, let's forget the position of decoration tentatively
+    move A3 on top of A2, let's forget the relative position between person and surroundings tentatively
+    """
+    firstTwo = [l[:2] for l in layers]
+    if 'A2' in firstTwo and 'A3' in firstTwo:
+        if firstTwo.index('A2') > firstTwo.index('A3'):
+            warnings.warn('In image %s A2 is on the top of A3! Exchange them!' % file, RuntimeWarning)
+            a3 = layers[firstTwo.index('A3')]
+            layers.remove(a3)
+            layers.insert(firstTwo.index('A2')+1, a3)
+
+    if 'A4' in layers:
+        if layers.index('A4') != len(layers) - 1:
+            warnings.warn('In image %s A4 is not at the top! Move it to the top!' % file, RuntimeWarning)
+            layers.remove('A4')
+            layers.append('A4')
+
+    return layers
+
 def cleanName(name):
     """
     remove irregular marks in adobe illustrator
@@ -60,7 +82,7 @@ def cleanName(name):
 
 def name2code(name):
     """
-    input: A-1-2-3-4 or A1234
+    input: 'A-1-2-3-4' or 'A1234'
     output: [1,2,3,4]
     """
     name = cleanName(name)
@@ -88,9 +110,14 @@ def checkLayerNames(names):
     if 1 in cat_codes:
         assert(cat_codes.index(1) == 0), 'background should be the most bottom!'
 
-    # if decoration in, it must be the most top or bottom layer
+    ## if decoration in, it must be the most top or bottom layer
+    # if 4 in cat_codes:
+    #     assert(cat_codes.index(4) == 0 or cat_codes.index(4) == len(cat_codes) - 1), 'decoration should be the most top or bottom!'
+
+    # if decoration in, it must be the most top layer
+    # Let's assert this for now
     if 4 in cat_codes:
-        assert(cat_codes.index(4) == 0 or cat_codes.index(4) == len(cat_codes) - 1), 'decoration should be the most top or bottom!'
+        assert(cat_codes.index(4) == len(cat_codes) - 1), 'decoration should be the most top!'
 
     ## one of surrounding or person should be in the scene
     assert(2 in cat_codes or 3 in cat_codes), 'Neither person nor surroundings are found in the scene!'
@@ -116,9 +143,9 @@ class CategEncoder():
         self.features_.extend(['_Background_',
                                '_Surroundings_',
                                '_Person_',
-                               '_Decoration_',
-                               '_P_in_front_of_S_',
-                               '_S_in_front_of_P_'])
+                               '_Decoration_'])
+                               # '_P_in_front_of_S_',
+                               # '_S_in_front_of_P_'])
 
         # categorical features
         self.srd_categ = getNestedKey(surrouding_dict)
@@ -126,6 +153,9 @@ class CategEncoder():
         self.category_ = self.srd_categ + self.prs_categ
         self.features_.extend(['_S_%s_' % k for k in self.srd_categ])
         self.features_.extend(['_P_%s_' % k for k in self.prs_categ])
+
+        # pair features
+        self.features_.extend(['_S_%s-P_%s_' % (ks, kp) for ks in self.srd_categ for kp in self.prs_categ])
 
     def encode(self, layer_names):
 
@@ -142,21 +172,30 @@ class CategEncoder():
             feat_layer[code[0] - 1] = 1
         features.append(feat_layer)
 
-        # occlusion, person in front of surrounding, or otherwise
-        cat_codes = [code[0] for code in codes]
-        if 2 in cat_codes and 3 in cat_codes:
-            if cat_codes.index(2) < cat_codes.index(3):
-                # person in the front
-                features.append([1,0])
-            else:
-                # surrounding in the front
-                features.append([0,1])
-        else:
-            features.append([0,0])
+        """
+        Let's resolve the occlusion tentatively.
+        The case that surrounding in front of person is too rare and make the reality discriminator too easy.
+        The only case that surrounding should be in front of person:
+            14.svg
+        """
+        # # occlusion, person in front of surrounding, or otherwise
+        # cat_codes = [code[0] for code in codes]
+        # if 2 in cat_codes and 3 in cat_codes:
+        #     if cat_codes.index(2) < cat_codes.index(3):
+        #         # person in the front
+        #         features.append([1,0])
+        #     else:
+        #         # surrounding in the front
+        #         features.append([0,1])
+        # else:
+        #     features.append([0,0])
 
         # sub-categories, keyword exists - binary
         ## In fact: one-hot in each level, ensured by the codes
         features.append(self.keyword2feature(self.layer2keyword(layer_names)))
+
+        # cross similarities between subcategories
+        features.append(self.crossSimi(layer_names))
 
         return flattenNested(features)
 
@@ -180,6 +219,22 @@ class CategEncoder():
                 subcode = codes[cat_codes.index(c)][1:]
                 keywords.extend(getNestedKeyWithCode(dic, subcode))
         return keywords
+
+    def crossSimi(self, layer_names):
+        codes = [name2code(name) for name in layer_names]
+        cat_codes = [code[0] for code in codes] # get head category
+
+        srd_keys = []
+        if 2 in cat_codes:
+            subcode = codes[cat_codes.index(2)][1:]
+            srd_keys = getNestedKeyWithCode(surrouding_dict, subcode)
+
+        prs_keys = []
+        if 3 in cat_codes:
+            subcode = codes[cat_codes.index(3)][1:]
+            prs_keys = getNestedKeyWithCode(person_dict, subcode)
+
+        return [wrapRelaxedSimi(ks, kp) if ks in srd_keys and kp in prs_keys else 0 for ks in self.srd_categ for kp in self.prs_categ]
 
 
 ### Image synthesis
