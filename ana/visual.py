@@ -36,6 +36,14 @@ def ROC(y_true, y_prob):
     plt.subplot(1,2,1)
     precision, recall, thresholds = precision_recall_curve(y_true,
                                                            y_prob)
+
+    def _F1(p, r): return 2*p*r / (p+r)
+    print('precision | recall | F1 | threshold')
+    print('------------------------------')
+    for p, r, t in zip(precision, recall, thresholds):
+        print('%.3f | %.3f | %.3f | %.3f' % (p, r, _F1(p, r), t))
+    print('------------------------------')
+
     ap = average_precision_score(y_true, y_prob)
     # print(thresholds)
     # In matplotlib < 1.5, plt.fill_between does not have a 'step' argument
