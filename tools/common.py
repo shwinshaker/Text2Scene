@@ -1,6 +1,6 @@
 #!./env python
 
-## Nested list
+### Nested list
 def flattenNested(nested):
     """
     Flatten a nested list
@@ -119,7 +119,8 @@ def packAppend(l, append_l):
             new_l.append(k + [ka])
     return new_l
 
-## Nested dictionary
+
+### Nested dictionary
 
 def getNestedKey(obj):
     """
@@ -241,3 +242,14 @@ def getAllKeyCombsFromNested(obj):
         raise TypeError('Invalid type other than str and dict. Could be incorrect query code!')
 
     return keys
+
+
+### sparse matrix
+def sparse_shuffle(X, interval=1):
+    from scipy import sparse
+    import numpy as np
+    assert(isinstance(X, sparse.csr.csr_matrix))
+
+    index_split = np.array_split(np.arange(X.shape[0]), X.shape[0]/interval)
+    np.random.shuffle(index_split)
+    return X[np.hstack(index_split)]

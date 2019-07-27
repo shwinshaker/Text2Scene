@@ -160,4 +160,8 @@ def getAllLayerCombs():
     all_layers = []
     for layers in getAllHeadLayersCode():
         all_layers.extend(expandCategory(layers))
+    # sanity check
+    assert(len(all_layers) == 11*4+13*4+11*13*4), len(all_layers)
+    for layer in all_layers:
+        checkLayerNames(layer)
     return all_layers

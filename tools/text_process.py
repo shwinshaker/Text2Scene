@@ -6,9 +6,7 @@ from nltk.stem import WordNetLemmatizer, PorterStemmer
 from nltk import pos_tag
 from nltk.corpus import wordnet as wn
 from nltk.corpus import stopwords
-from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 import string
-import glob
 import warnings
 
 ### text processing
@@ -85,33 +83,4 @@ class LemmaTokenizer(object):
         return self.__filter([self.lemmatize(t, tag) for t, tag in self.pos_tagger(self.tokenize(sentence))])
         #
         # return self.wsd(self.__filter([self.lemmatize(t, tag) for t, tag in pos_tag(word_tokenize(sentence))]), sentence)
-
-class TfidfEncoder():
-    def __init__(self, txt_dir='text'):
-        ## tokenizer
-        self.tokenizer = LemmaTokenizer()
-        corpus = []
-        for fileName in sorted(glob.glob('text/*.txt')):
-            with open(fileName, 'r') as f:
-                sent = f.read()
-                tokens = self.tokenizer(sent)
-                corpus.append(tokens)
-
-        ## vectorizer
-        self.vectorizer = TfidfVectorizer(ngram_range=(1,2),
-                                          norm=None,
-                                          sublinear_tf=True,
-                                          stop_words=[],
-                                          lowercase=False,
-                                          tokenizer=lambda l: l)
-        self.vectorizer.fit(corpus)
-
-        ## features
-        self.vocab_, _ = zip(*sorted(self.vectorizer.vocabulary_.items(), key=lambda x:x[::-1]))
-
-    def encode(self, sentence):
-        assert(isinstance(sentence, str))
-        tokens = self.tokenizer(sentence)
-        return self.vectorizer.transform([tokens]).toarray()[0]
-
 
