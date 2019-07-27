@@ -57,6 +57,10 @@ class LemmaTokenizer(object):
         # if nouns, verbs, adjs, advs, lemmatize
         if tag: # N,V,ADJ,ADV
             lemma = self.lemma.lemmatize(token, tag)
+            # remove stopwords
+            # Eg. remove 'be'
+            if lemma in self.stopwords:
+                return None
             ### wn.morphy can also do this job
             ### actually lemmatize calls morphy
             ### rule-based suffix detachment. Eg. corpora -> corpus
