@@ -1,4 +1,8 @@
 #!./env python
+from scipy import sparse
+import numpy as np
+import glob
+import re
 
 ### Nested list
 def flattenNested(nested):
@@ -243,13 +247,28 @@ def getAllKeyCombsFromNested(obj):
 
     return keys
 
+class Normalizer():
+    """
+    A transformer used for standard normalization
+    """
+    def __init__(self):
+        pass
 
-### sparse matrix
-def sparse_shuffle(X, interval=1):
-    from scipy import sparse
-    import numpy as np
-    assert(isinstance(X, sparse.csr.csr_matrix))
+    def fit(self, x):
+        self.mean = np.mean(x)
+        self.std = np.std(x)
 
-    index_split = np.array_split(np.arange(X.shape[0]), X.shape[0]/interval)
-    np.random.shuffle(index_split)
-    return X[np.hstack(index_split)]
+    def transform(self, x):
+        return (x - self.mean) / self.std
+
+def sigmoid(x):
+    return 1/(1+np.exp(-x))
+
+# files
+
+def getOrderedList(path):
+    for f in sorted(glob.glob(path),
+                    key=lambda f: int(re.findall(r'\d+', f)[0])):
+        yield f
+
+

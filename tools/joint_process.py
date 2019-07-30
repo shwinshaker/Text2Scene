@@ -16,7 +16,10 @@ def relaxedSimi(syn1, syn2):
 def wrapRelaxedSimi(t1, t2):
     if t1 is None or t2 is None:
         return 0
-    return relaxedSimi(wn.synset(t1), wn.synset(t2))
+    try:
+        return relaxedSimi(wn.synset(t1), wn.synset(t2))
+    except WordNetError:
+        return 0
 
 def maxSimi(synset, keyword):
     """

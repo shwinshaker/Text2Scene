@@ -16,12 +16,16 @@ class LemmaTokenizer(object):
         self.pos_tagger = pos_tag
         self.lemma = WordNetLemmatizer()
         # later
-        self.corrector = lambda x: x.lower() # SpellCorrector()
+        # self.corrector = lambda x: x.lower() # SpellCorrector()
         # todo
         # to deal with abbreviations better, like it's can't
 
         self.stopwords = stopwords.words('english')
         self.punctuation = string.punctuation
+
+    def corrector(self, token):
+        # todo
+        return token.lower()
 
     def penn_to_wn(self, tag):
         """

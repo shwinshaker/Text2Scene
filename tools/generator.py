@@ -1,6 +1,7 @@
 #!./env python
 
 import random
+# random.seed(7)
 from tools.image_process import checkLayerNames
 from rules.category import surrouding_dict, person_dict
 
