@@ -6,25 +6,41 @@ from scipy import sparse
 
 from models.encoder import TfidfEncoder, CategEncoder, SimiEncoder
 from tools.image_process import getLayerNames
-from tools.common import getOrderedList
+from tools.common import getFiles #getOrderedList
 
 # random image generator, subject to rules
 from tools.generator import ranGenLayer, getAllLayerCombs
 
 class Dataset():
-    def __init__(self, img_dir='images', txt_dir='text'):
+    def __init__(self, img_dir='images', txt_dir='text',
+                                         index=None,
+                                         text_idf=True,
+                                         categ_idf=True,
+                                         cross_simi=True,
+                                         norm_simi=True,
+                                         suppress_freq=3):
         self.img_dir = img_dir
         self.txt_dir = txt_dir
+        self.index = index
 
         # fitting the vectorizer will process all the text
         # so we have double processed the text here
         print(' - Initialize image encoder..')
-        self.img_encoder = CategEncoder()
+        self.img_encoder = CategEncoder(index=index,
+                                        idf=categ_idf,
+                                        # simi=cross_simi,
+                                        # suppress_freq=suppress_freq,
+                                        norm_simi=norm_simi)
         print(' - Initialize text encoder..')
-        self.txt_encoder = TfidfEncoder()
+        self.txt_encoder = TfidfEncoder(index=index)
         print(' - Initialize joint encoder..')
         self.joint_encoder = SimiEncoder(self.img_encoder,
-                                         self.txt_encoder)
+                                         self.txt_encoder,
+                                         text_idf=text_idf,
+                                         categ_idf=categ_idf,
+                                         simi=cross_simi,
+                                         norm_simi=norm_simi,
+                                         suppress_freq=suppress_freq)
 
         # set features
         print(' - Set feature names..')
@@ -33,7 +49,7 @@ class Dataset():
         self.features_.extend(self.img_encoder.features_)
         self.features_.extend(self.joint_encoder.features_)
 
-        # all possible layers: for check
+        # get all possible combinations of layers: for check
         self.all_layers = getAllLayerCombs()
 
     def getOneLayerSent(self, txt_name=None, img_name=None,
@@ -43,9 +59,11 @@ class Dataset():
         ## text
         if ran_txt:
             # all_txt = glob.glob(self.txt_dir+'/*.txt')
-            all_txt = list(getOrderedList(self.txt_dir+'/*.txt'))
+            # all_txt = list(getOrderedList(self.txt_dir+'/*.txt'))
+            all_txt = list(getFiles(self.txt_dir, ext='.txt', index=self.index))
             # rule out current text
-            all_txt.remove(txt_name)
+            if txt_name in all_txt:
+                all_txt.remove(txt_name)
             txt_name = random.choice(all_txt)
         else:
             assert(txt_name)
@@ -58,8 +76,10 @@ class Dataset():
             assert img_name
             assert not fake_img
             # all_img = glob.glob(self.img_dir+'/*.svg')
-            all_img = list(getOrderedList(self.img_dir+'/*.svg'))
-            all_img.remove(img_name)
+            # all_img = list(getOrderedList(self.img_dir+'/*.svg'))
+            all_img = list(getFiles(self.img_dir, ext='.svg', index=self.index))
+            if img_name in all_img:
+                all_img.remove(img_name)
             img_name = random.choice(all_img)
             layers = getLayerNames(img_name)
         elif fake_img:
@@ -133,21 +153,23 @@ class Dataset():
 
     def __len__(self):
         # return len(glob.glob(self.img_dir+'/*.svg'))
-        return len(list(getOrderedList(self.img_dir+'/*.svg')))
+        # return len(list(getOrderedList(self.img_dir+'/*.svg')))
+        return len(list(getFiles(self.img_dir, ext='.svg', index=self.index)))
 
 
 class DatasetReality(Dataset):
     """
     Dataset used to discriminate real images and fake images
     """
-    def __init__(self):
+    def __init__(self, img_dir='images', txt_dir='text', index=None, **kwargs):
 
-        super().__init__()
+        super().__init__(img_dir, txt_dir, index, **kwargs)
 
         # all layers that appeared
         # all_imgs = glob.glob(self.img_dir+'/*.svg')
         print(' - Build fake layers..')
-        all_imgs = list(getOrderedList(self.img_dir+'/*.svg'))
+        # all_imgs = list(getOrderedList(self.img_dir+'/*.svg'))
+        all_imgs = list(getFiles(self.img_dir, ext='.svg', index=self.index))
         self.true_layers = [getLayerNames(img) for img in all_imgs]
         self.fake_layers = self.__list_diff(self.all_layers,
                                             self.true_layers)

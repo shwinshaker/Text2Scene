@@ -1,6 +1,5 @@
 #!./env python
 from scipy import sparse
-import numpy as np
 import glob
 import re
 
@@ -247,28 +246,22 @@ def getAllKeyCombsFromNested(obj):
 
     return keys
 
-class Normalizer():
-    """
-    A transformer used for standard normalization
-    """
-    def __init__(self):
-        pass
+# file IO
 
-    def fit(self, x):
-        self.mean = np.mean(x)
-        self.std = np.std(x)
+def getFiles(path, ext, index=None):
+    assert(ext.startswith('.')), 'extension must start with .!'
 
-    def transform(self, x):
-        return (x - self.mean) / self.std
+    if index is None:
+        index = []
+        for filename in glob.glob('%s/*%s' % (path, ext)):
+            index.append(int(re.findall(r'\d+', filename)[0]))
+        index.sort()
 
-def sigmoid(x):
-    return 1/(1+np.exp(-x))
+    for ind in index:
+        yield '%s/%i%s' % (path, ind, ext)
 
-# files
-
-def getOrderedList(path):
-    for f in sorted(glob.glob(path),
-                    key=lambda f: int(re.findall(r'\d+', f)[0])):
-        yield f
+    # for f in sorted(glob.glob('%s/*%s' % (path, ext)),
+    #                 key=lambda f: int(re.findall(r'\d+', f)[0])):
+    #     yield f
 
 

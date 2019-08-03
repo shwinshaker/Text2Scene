@@ -15,6 +15,38 @@ class Discriminator():
         with open('results/discriminator.pkl', 'rb') as f:
            return dill.load(f)
 
+def getMaxContrbutionFeature(layers, sentence, dsct, lamb):
+    cons_coeff_dict = dict(zip(dsct.dataset.features_, dsct.clf.coef_.tolist()[0]))
+    real_coeff_dict = dict(zip(dsct.dataset_r.features_, dsct.clf_r.coef_.tolist()[0]))
+
+    vec = dsct.dataset.encode(layers, sentence)
+    nonzerofeats = []
+    for i in np.where(vec!=0)[0]:
+        feature = dsct.dataset.features_[i]
+        if cons_coeff_dict[feature] != 0:
+            nonzerofeats.append(('cons',
+                                 feature,
+                                 vec[i],
+                                 cons_coeff_dict[feature]))
+
+    vec = dsct.dataset_r.img_encoder.encode(layers)
+    nonzerofeats_r = []
+    for i in np.where(vec!=0)[0]:
+        feature = dsct.dataset_r.features_[i]
+        if real_coeff_dict[feature] != 0:
+            nonzerofeats_r.append(('real',
+                                   feature,
+                                   vec[i],
+                                   real_coeff_dict[feature]))
+
+    feats = nonzerofeats + nonzerofeats_r
+    def _w(key):
+        if key == 'cons':
+            return lamb
+        return 1 - lamb
+    # should be expansion of sigmods
+    return sorted(feats, key=lambda x: x[2]*x[3]*_w(x[0]))[::-1]
+
 def exhaustiveSearch(query_txt, discriminator, lamb=0.7):
     probs = []
     for i, layers in enumerate(discriminator.dataset.all_layers):
@@ -53,8 +85,9 @@ def categPrecision(discriminator, layers, sentence, lamb=0.5, verbose=False):
     F1 = _F1(precision, recall)
 
     if verbose:
+        print('Layers: ', layers)
         print('Keywords: ', discriminator.dataset.img_encoder.layer2keyword(layers))
-        print('Sentence: %s' % sentence)
+        print('Sentence: %s' % sentence.strip('\n'))
         print('Tokens:', tokens)
         seen_tokens = []
         for token in tokens:
@@ -62,13 +95,15 @@ def categPrecision(discriminator, layers, sentence, lamb=0.5, verbose=False):
                 seen_tokens.append(token)
         print('Seen tokens:', seen_tokens)
         # print('\nMost consistent layer:', pred_layers)
-        print('\nPredicted keywords:', discriminator.dataset.img_encoder.layer2keyword(pred_layers), 'Prob: %.6f' % prob)
-        print('Acc: %.6f - Precision: %.6f - Recall: %.6f - F1: %.6f' % (acc, precision, recall, F1))
+        print('\nPredicted layers: ', pred_layers)
+        print('Predicted keywords:', discriminator.dataset.img_encoder.layer2keyword(pred_layers), 'Prob: %.6f' % prob)
+        print('Max contributed features:', getMaxContrbutionFeature(pred_layers, sentence, discriminator, lamb))
+    print('Acc: %.6f - Precision: %.6f - Recall: %.6f - F1: %.6f' % (acc, precision, recall, F1))
 
     return acc, F1
 
 
-def categMetric(discriminator, index=None, test_num=5, lamb=1.0):
+def categMetric(discriminator, index=None, test_num=5, lamb=1.0, verbose=True):
     if index is None:
         # import random
         # index = list(range(len(discriminator.dataset)))
@@ -82,12 +117,31 @@ def categMetric(discriminator, index=None, test_num=5, lamb=1.0):
     for c, i in enumerate(index):
         img = 'images/%i.svg' % i
         txt = 'text/%i.txt' % i
+        print(' [%i] ------ %i -----' % (c, i), end='\n\n')
         acc, F1 = categPrecision(discriminator,
                                  *discriminator.dataset.getOneLayerSent(txt, img),
-                                 lamb=lamb, verbose=False)
-        print('%i-----------' % c)
+                                 lamb=lamb, verbose=verbose)
         F1s.append(F1)
     mF1 = sum(F1s)/len(F1s)
     print('mean F1: %.6f' % mF1)
 
     return mF1
+
+# def getMaxContrbutionFeature(layers, sentence, dataset, clf):
+#     coeff_dict = dict(zip(dataset.features_, clf.coef_.tolist()[0]))
+# 
+#     # img = 'images/%i.svg' % index
+#     # txt = 'text/%i.txt' % index
+#     vec = dataset.encode(*dataset.getOneLayerSent(txt, img))
+# 
+#     tuples = []
+#     for i in np.where(vec!=0)[0]:
+#         feature = dataset.features_[i]
+#         if coeff_dict[feature] != 0:
+#             tuples.append((feature, vec[i], coeff_dict[feature]))
+#     return sorted(tuples, key=lambda x: abs(x[1]))[::-1]
+
+
+
+
+

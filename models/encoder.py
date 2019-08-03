@@ -5,11 +5,12 @@
 ### image encoder
 from rules.category import person_dict, surrouding_dict
 from tools.common import getNestedKey, getNestedKeyWithCode
-from tools.joint_process import wrapRelaxedSimi
 from tools.common import flattenNested #, extractLeaf, getDepth
-from tools.common import getOrderedList
+from tools.common import getFiles
 from tools.image_process import name2code
-from tools.joint_process import sentSimi, wrapRelaxedSimi
+from tools.joint_process import wrapRelaxedSimi, sentSimi
+from tools.math import Normalizer
+from sklearn.preprocessing import MinMaxScaler
 
 class BinaryCategEncoder():
     """
@@ -86,7 +87,10 @@ class BinaryCategEncoder():
 
 
 class CategEncoder():
-    def __init__(self, idf=False):
+    def __init__(self, img_dir='images', idf=True, norm_simi=True, index=None):
+
+        self.idf = idf
+        self.norm_simi = norm_simi
 
         print('  - Set feature names..')
         # get feature names
@@ -114,16 +118,16 @@ class CategEncoder():
         self.features_.extend(['_S_%s-P_%s_' % (ks, kp) for ks in self.srd_categ for kp in self.prs_categ])
 
         print('  - Build category level idf..')
-        idf = True
         # category idf
-        if idf:
+        if self.idf:
             from tools.image_process import getLayerNames
             keywords_list = []
-            # for img in sorted(glob.glob('images/*.svg'),
-            #                   key=lambda img: int(re.findall(r'\d+', img)[0])):
-            for img in getOrderedList('images/*.svg'):
+            root_keywords_list = []
+            # for img in getOrderedList('images/*.svg'):
+            for img in getFiles(img_dir, ext='.svg', index=index):
                 layers = getLayerNames(img)
                 keywords_list.append(self.layer2keyword(layers))
+                root_keywords_list.append(self.layer2rootKey(layers))
 
             vectorizer = TfidfVectorizer(norm=None,
                                          sublinear_tf=True,
@@ -133,17 +137,16 @@ class CategEncoder():
             vectorizer.fit(keywords_list)
             vocab_, _ = zip(*sorted(vectorizer.vocabulary_.items(),
                                     key=lambda x: x[::-1]))
-            assert(set(vocab_) == set(self.category_))
-            self.idf_ = dict(zip(vocab_, vectorizer.idf_))
+            try:
+                assert(set(vocab_) == set(self.category_))
+            except AssertionError:
+                print('The following keywords do not appear in the training set. Possible risk exists when applied to test data, resolve later.', set(self.category_) - set(vocab_))
 
-            # root idf
-            root_keywords_list = []
-            # for img in sorted(glob.glob('images/*.svg'),
-            #                   key=lambda img: int(re.findall(r'\d+', img)[0])):
-            for img in getOrderedList('images/*.svg'):
-                layers = getLayerNames(img)
-                root_keywords_list.append(self.layer2rootKey(layers))
+            minmaxscaler = MinMaxScaler()
+            idf_ = minmaxscaler.fit_transform(vectorizer.idf_.reshape(-1,1)).ravel()
+            self.idf_ = dict(zip(vocab_, idf_))
 
+            # root category idf
             root_vectorizer = TfidfVectorizer(norm=None,
                                               sublinear_tf=True,
                                               stop_words=[],
@@ -153,13 +156,18 @@ class CategEncoder():
             vocab_, _ = zip(*sorted(root_vectorizer.vocabulary_.items(),
                                     key=lambda x: x[::-1]))
             assert(set(vocab_) == set(self.root_category_))
-            self.root_idf_ = dict(zip(vocab_, root_vectorizer.idf_))
 
-        print('  - Build similarity normalizer..')
-        # simi normalizer
-        simis = np.array([wrapRelaxedSimi(ks, kp) for ks in self.srd_categ for kp in self.prs_categ])
-        self.simi_normalizer = Normalizer()
-        self.simi_normalizer.fit(simis)
+            minmaxscaler = MinMaxScaler()
+            idf_ = minmaxscaler.fit_transform(root_vectorizer.idf_.reshape(-1,1)).ravel()
+            self.root_idf_ = dict(zip(vocab_, idf_))
+            # self.root_idf_ = dict(zip(vocab_, root_vectorizer.idf_))
+
+        # simis standard normalizer
+        if self.norm_simi:
+            print('  - Build similarity normalizer..')
+            simis = np.array([wrapRelaxedSimi(ks, kp) for ks in self.srd_categ for kp in self.prs_categ])
+            self.simi_normalizer = Normalizer()
+            self.simi_normalizer.fit(simis)
 
     def encode(self, layer_names):
 
@@ -220,15 +228,17 @@ class CategEncoder():
         """
         convert root category names to binary features
         """
-        return [1 * self.root_idf_[k] if k in keywords else 0 for k in self.root_category_]
-        # return [1 if k in keywords else 0 for k in self.root_category_]
+        if self.idf:
+            return [1 * self.root_idf_[k] if k in keywords else 0 for k in self.root_category_]
+        return [1 if k in keywords else 0 for k in self.root_category_]
 
     def keyword2feature(self, keywords):
         """
         Convert category keywords to binary features
         """
-        return [1 * self.idf_[k] if k in keywords else 0 for k in self.category_]
-        # return [1 if k in keywords else 0 for k in self.category_]
+        if self.idf:
+            return [1 * self.idf_[k] if k in keywords else 0 for k in self.category_]
+        return [1 if k in keywords else 0 for k in self.category_]
 
     def layer2keyword(self, layer_names):
         """
@@ -259,11 +269,19 @@ class CategEncoder():
             subcode = codes[cat_codes.index(3)][1:]
             prs_keys = getNestedKeyWithCode(person_dict, subcode)
 
-        # return [wrapRelaxedSimi(ks, kp) if ks in srd_keys and kp in prs_keys else 0 for ks in self.srd_categ for kp in self.prs_categ]
-        # return [self.idf_[ks] * self.idf_[kp] * wrapRelaxedSimi(ks, kp) if ks in srd_keys and kp in prs_keys else 0 for ks in self.srd_categ for kp in self.prs_categ]
         ## using normalized similarities yields similar performance
-        # return [self.simi_normalizer.transform(wrapRelaxedSimi(ks, kp)) if ks in srd_keys and kp in prs_keys else 0 for ks in self.srd_categ for kp in self.prs_categ]
-        return [self.idf_[ks] * self.idf_[kp] * self.simi_normalizer.transform(wrapRelaxedSimi(ks, kp)) if ks in srd_keys and kp in prs_keys else 0 for ks in self.srd_categ for kp in self.prs_categ]
+        if self.idf and self.norm_simi:
+            return [self.idf_[ks] * self.idf_[kp] * self.simi_normalizer.transform(wrapRelaxedSimi(ks, kp)) if ks in srd_keys and kp in prs_keys else 0 for ks in self.srd_categ for kp in self.prs_categ]
+
+        if self.idf:
+            return [self.idf_[ks] * self.idf_[kp] * wrapRelaxedSimi(ks, kp) if ks in srd_keys and kp in prs_keys else 0 for ks in self.srd_categ for kp in self.prs_categ]
+
+        if self.norm_simi:
+            return [self.simi_normalizer.transform(wrapRelaxedSimi(ks, kp)) if ks in srd_keys and kp in prs_keys else 0 for ks in self.srd_categ for kp in self.prs_categ]
+
+        return [wrapRelaxedSimi(ks, kp) if ks in srd_keys and kp in prs_keys else 0 for ks in self.srd_categ for kp in self.prs_categ]
+
+
 
 
 ### text encoder
@@ -271,12 +289,15 @@ from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from tools.text_process import LemmaTokenizer
 
 class TfidfEncoder():
-    def __init__(self, txt_dir='text'):
+    def __init__(self, txt_dir='text', index=None):
+        self.txt_dir = txt_dir
+
         ## tokenizer
         self.tokenizer = LemmaTokenizer()
         corpus = []
         # for fileName in sorted(glob.glob('text/*.txt')):
-        for fileName in getOrderedList('text/*.txt'):
+        # for fileName in getOrderedList('text/*.txt'):
+        for fileName in getFiles(txt_dir, ext='.txt', index=index):
             with open(fileName, 'r') as f:
                 sent = f.read()
                 tokens = self.tokenizer(sent)
@@ -295,11 +316,14 @@ class TfidfEncoder():
         self.vocab_, _ = zip(*sorted(self.vectorizer.vocabulary_.items(),
                                      key=lambda x:x[::-1]))
 
+        minmaxscaler = MinMaxScaler()
+        idf_ = minmaxscaler.fit_transform(self.vectorizer.idf_.reshape(-1,1)).ravel()
         # idf dict
-        self.idf_ = dict(zip(self.vocab_, self.vectorizer.idf_))
+        # self.idf_ = dict(zip(self.vocab_, self.vectorizer.idf_))
+        self.idf_ = dict(zip(self.vocab_, idf_))
 
     def encode(self, sentence):
-        assert(isinstance(sentence, str))
+        assert(isinstance(sentence, str)), sentence
         tokens = self.tokenizer(sentence)
         return self.vectorizer.transform([tokens]).toarray()[0]
 
@@ -307,12 +331,21 @@ class TfidfEncoder():
 ### joint encoder
 import numpy as np
 from scipy import sparse
-from tools.common import Normalizer
 
 class SimiEncoder():
-    def __init__(self, img_encoder, txt_encoder):
+    def __init__(self, img_encoder, txt_encoder, text_idf=True,
+                                                 categ_idf=True,
+                                                 simi=True,
+                                                 norm_simi=True,
+                                                 suppress_freq=3):
         self.img_encoder = img_encoder
         self.txt_encoder = txt_encoder
+
+        self.text_idf = text_idf
+        self.categ_idf = categ_idf
+        self.simi = simi
+        self.norm_simi = norm_simi
+        self.suppress_freq = suppress_freq
 
         # set features
         ### be extremely careful here for the order of feature names
@@ -325,12 +358,13 @@ class SimiEncoder():
         self.simi_ = dict(zip(self.features_, simis))
 
         # simi normalizer
-        # simis = np.array([wrapRelaxedSimi(k, t) for k in self.img_encoder.category_ for t in self.txt_encoder.vocab_ if len(t.split()) == 1])
-        self.simi_normalizer = Normalizer()
-        # self.simi_normalizer.fit(simis)
-        ## should we filter out 0? yep, too many 0, otherwise normalize takes no effects
-        ### filtering out 0 strongly reduces the performance
-        self.simi_normalizer.fit([s for s in simis if s != 0])
+        if self.norm_simi:
+            # simis = np.array([wrapRelaxedSimi(k, t) for k in self.img_encoder.category_ for t in self.txt_encoder.vocab_ if len(t.split()) == 1])
+            self.simi_normalizer = Normalizer()
+            # self.simi_normalizer.fit(simis)
+            ## should we filter out 0? yep, too many 0, otherwise normalize takes no effects
+            ### filtering out 0 strongly reduces the performance
+            self.simi_normalizer.fit([s for s in simis if s != 0])
 
     def encode(self, layer_names, sentence):
         assert(isinstance(layer_names, list))
@@ -340,15 +374,39 @@ class SimiEncoder():
 
         keywords = self.img_encoder.layer2keyword(layer_names)
         tokens = self.txt_encoder.tokenizer(sentence)
+
+        feats = []
+        for k in self.img_encoder.category_:
+            for t in self.txt_encoder.vocab_:
+                if k in keywords and t in tokens:
+                    if self.simi:
+                        feat = wrapRelaxedSimi(k, t)
+                        if self.norm_simi:
+                            # if simi = 0 means unavailable simi, skip it
+                            if feat != 0:
+                                feat = self.simi_normalizer.transform(feat)
+                    else:
+                        feat = 1
+                    if self.text_idf:
+                        feat *= self.txt_encoder.idf_[t]**self.suppress_freq
+                    if self.categ_idf:
+                        feat *= self.img_encoder.idf_[k]**self.suppress_freq
+                    feats.append(feat)
+                else:
+                    feats.append(0)
+        return np.array(feats)
+
         # return np.array(flattenNested([sentSimi(tokens, k, self.txt_encoder.vocab_) if k in keywords else sentSimi(tokens, None, self.txt_encoder.vocab_) for k in self.img_encoder.category_]))
         # return np.array([1 if k in keywords and t in tokens else 0 for k in self.img_encoder.category_ for t in self.txt_encoder.vocab_])
         # return np.array([self.txt_encoder.idf_[t] if k in keywords and t in tokens else 0 for k in self.img_encoder.category_ for t in self.txt_encoder.vocab_])
-        return np.array([self.txt_encoder.idf_[t] * self.simi_normalizer.transform(wrapRelaxedSimi(k, t)) if k in keywords and t in tokens else 0 for k in self.img_encoder.category_ for t in self.txt_encoder.vocab_])
+        # return np.array([self.txt_encoder.idf_[t] * self.simi_normalizer.transform(wrapRelaxedSimi(k, t)) if k in keywords and t in tokens else 0 for k in self.img_encoder.category_ for t in self.txt_encoder.vocab_])
+
                 ## - fix this dict - tell P and S - speed up
                 ## but need to differ P and S, put it up
-        ## return np.array([self.idf_[t] * self.simi_normalizer.transform(self.simi_) if k in keywords and t in tokens else 0 for k in self.img_encoder.category_ for t in self.txt_encoder.vocab_])
-        # return np.array([self.idf_[t] * wrapRelaxedSimi(k, t) if k in keywords and t in tokens else 0 for k in self.img_encoder.category_ for t in self.txt_encoder.vocab_])
-        # return np.array([wrapRelaxedSimi(k, t) if k in keywords and t in tokens else 0 for k in self.img_encoder.category_ for t in self.txt_encoder.vocab_])
+        # return np.array([self.txt_encoder.idf_[t] * wrapRelaxedSimi(k, t) if k in keywords and t in tokens else 0 for k in self.img_encoder.category_ for t in self.txt_encoder.vocab_])
+
+        # return np.array([self.simi_normalizer.transform(wrapRelaxedSimi(k, t)) if k in keywords and t in tokens else 0 for k in self.img_encoder.category_ for t in self.txt_encoder.vocab_])
+       #  return np.array([wrapRelaxedSimi(k, t) if k in keywords and t in tokens else 0 for k in self.img_encoder.category_ for t in self.txt_encoder.vocab_])
         # return np.array([self.txt_encoder.idf_[t] * self.img_encoder.idf_[k] * self.simi_normalizer.transform(wrapRelaxedSimi(k, t)) if k in keywords and t in tokens else 0 for k in self.img_encoder.category_ for t in self.txt_encoder.vocab_])
 
 
