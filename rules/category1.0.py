@@ -14,16 +14,13 @@ surrouding_dict = dict()
 #       because POS is different
 #       But they are actually similar
 #
-surrouding_dict['room.n.01'] = {'object.n.01': ['furniture.n.01',
+surrouding_dict['indoor.a.01'] = {'object.n.01': ['furniture.n.01',
                                                   'appliance.n.02',
                                                   'wall.n.01',
                                                   'sundries.n.01'],
                                   'abstraction.n.01': ['chart.n.01', 'art.n.01']}
 
-# why don't we use nested list?
-# nested list has subordination ambiguity between strings and lists at each level
-
-surrouding_dict['landscape.n.01'] = {'city.n.01': ['street.n.01',
+surrouding_dict['outdoor.a.01'] = {'city.n.01': ['street.n.01',
                                                  'building.n.01',
                                                  'vehicle.n.01'],
                                    'nature.n.03':['park.n.02', 'wild.n.01']}

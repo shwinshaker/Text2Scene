@@ -115,7 +115,8 @@ class CategEncoder():
         self.features_.extend(['_P_%s_' % k for k in self.prs_categ])
 
         # pair features
-        self.features_.extend(['_S_%s-P_%s_' % (ks, kp) for ks in self.srd_categ for kp in self.prs_categ])
+        pair_features = ['_S_%s-P_%s_' % (ks, kp) for ks in self.srd_categ for kp in self.prs_categ]
+        self.features_.extend(pair_features)
 
         print('  - Build category level idf..')
         # category idf
@@ -162,12 +163,14 @@ class CategEncoder():
             self.root_idf_ = dict(zip(vocab_, idf_))
             # self.root_idf_ = dict(zip(vocab_, root_vectorizer.idf_))
 
+        simis = np.array([wrapRelaxedSimi(ks, kp) for ks in self.srd_categ for kp in self.prs_categ])
+        self.simi_ = dict(zip(pair_features, simis))
         # simis standard normalizer
         if self.norm_simi:
             print('  - Build similarity normalizer..')
-            simis = np.array([wrapRelaxedSimi(ks, kp) for ks in self.srd_categ for kp in self.prs_categ])
             self.simi_normalizer = Normalizer()
-            self.simi_normalizer.fit(simis)
+            # self.simi_normalizer.fit(simis)
+            self.simi_normalizer.fit([s for s in simis if s != 0])
 
     def encode(self, layer_names):
 
@@ -315,6 +318,8 @@ class TfidfEncoder():
         ## features
         self.vocab_, _ = zip(*sorted(self.vectorizer.vocabulary_.items(),
                                      key=lambda x:x[::-1]))
+        # self.vocab_ = list(self.vocab_)
+        # self.vocab_.append('token.n.01')
 
         minmaxscaler = MinMaxScaler()
         idf_ = minmaxscaler.fit_transform(self.vectorizer.idf_.reshape(-1,1)).ravel()
@@ -326,6 +331,8 @@ class TfidfEncoder():
         assert(isinstance(sentence, str)), sentence
         tokens = self.tokenizer(sentence)
         return self.vectorizer.transform([tokens]).toarray()[0]
+        # vec = self.vectorizer.transform([tokens]).toarray()[0]
+        # return np.append(vec, len(tokens))
 
 
 ### joint encoder
@@ -350,6 +357,7 @@ class SimiEncoder():
         # set features
         ### be extremely careful here for the order of feature names
         self.features_ = []
+        # self.features_.append('_length_')
         self.features_.extend(['_S_%s-%s_' % (k, t) for k in img_encoder.srd_categ for t in txt_encoder.vocab_])
         self.features_.extend(['_P_%s-%s_' % (k, t) for k in img_encoder.prs_categ for t in txt_encoder.vocab_])
 
@@ -376,6 +384,7 @@ class SimiEncoder():
         tokens = self.txt_encoder.tokenizer(sentence)
 
         feats = []
+        # feats.append(abs(len(keywords) - len(tokens)))
         for k in self.img_encoder.category_:
             for t in self.txt_encoder.vocab_:
                 if k in keywords and t in tokens:

@@ -50,6 +50,17 @@ def getDepth(li):
         li = [[''] if isinstance(l, list) and len(l) == 0 else l for l in li]
         li = [e for l in li if isinstance(l, list) for e in l]
 
+def getNodesWithDepth(li, depth):
+    from itertools import count
+    d0 = getDepth(li)
+    assert(depth > 0), 'Depth starts from 1'
+    assert(depth <= d0), 'Depth exceeds maximum depth %i' % d0
+    for level in count():
+        if level == depth:
+            return nodes
+        nodes = [l for l in li if not isinstance(l, list)]
+        li = [e for l in li if isinstance(l, list) for e in l]
+
 def recurReplace(nested, id_list, value=1):
     """
     Replace an element in a nested list recursively
@@ -245,6 +256,25 @@ def getAllKeyCombsFromNested(obj):
         raise TypeError('Invalid type other than str and dict. Could be incorrect query code!')
 
     return keys
+
+def nestedDict2NestedList(obj):
+    """
+    convert a nested dictionary to a nested list
+    """
+    keys=[]
+    if isinstance(obj, dict):
+        for key in obj:
+            keys.append(key)
+            keys.append(nestedDict2NestedList(obj[key]))
+    elif isinstance(obj, list):
+        for key in obj:
+            keys.extend(nestedDict2NestedList(key))
+    elif isinstance(obj, str):
+        keys.append(obj)
+    else:
+        raise KeyError
+    return keys
+
 
 # file IO
 

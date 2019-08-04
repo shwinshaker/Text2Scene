@@ -101,6 +101,8 @@ class Dataset():
         img_embed = self.img_encoder.encode(layers)
         joint_embed = self.joint_encoder.encode(layers, sent)
 
+        # return joint_embed
+
         return np.hstack([txt_embed, img_embed, joint_embed])
 
     def __getitem__(self, ind):
