@@ -2,6 +2,7 @@
 from scipy import sparse
 import glob
 import re
+import random
 
 ### Nested list
 def flattenNested(nested):
@@ -294,4 +295,6 @@ def getFiles(path, ext, index=None):
     #                 key=lambda f: int(re.findall(r'\d+', f)[0])):
     #     yield f
 
-
+def getMaterial(layer):
+    l = glob.glob('material/%s*.png' % layer)
+    return random.choice(l)

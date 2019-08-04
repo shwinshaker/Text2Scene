@@ -11,8 +11,9 @@ class Discriminator():
         self.clf_r = clf_r
 
     @staticmethod
-    def unpickle():
-        with open('results/discriminator.pkl', 'rb') as f:
+    def unpickle(model_path='results/discriminator.pkl'):
+        print('model path: %s' % model_path)
+        with open(model_path, 'rb') as f:
            return dill.load(f)
 
 def getMaxContrbutionFeature(layers, sentence, dsct, lamb):
