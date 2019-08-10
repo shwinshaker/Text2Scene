@@ -42,9 +42,9 @@ def getLayerNames(file):
         if svg.hasAttribute('id'):
             # if single layer case, id belongs to <svg>
             # todo - check there be at most 1 <g> on each level
-            assert(len([g for g in svg.childNodes \
-                          if g.nodeType == 1 and \
-                             g.tagName == 'g']) <= 1)
+            # assert(len([g for g in svg.childNodes \
+            #               if g.nodeType == 1 and \
+            #                  g.tagName == 'g']) <= 1), file
             return [cleanName(svg.getAttribute('id'))]
         else:
             raise ValueError('No valid id name found!')

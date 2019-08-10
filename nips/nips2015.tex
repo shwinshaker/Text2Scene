@@ -11,6 +11,7 @@
 % \documentstyle[nips14submit_09,times,art10]{article} % For LaTeX 2.09
 
 \usepackage{booktabs}
+\usepackage{makecell}
 
 \title{Text2Scene Generation \\ Discriminator \& Brutal-force search}
 
@@ -123,19 +124,36 @@ At this moment 92 pairs of pictures and descriptions are available. The above in
 \section{Feature engineering}
 We decide to build the discriminator with either a simple logistic regression or boosting model to . Thus feature engineering is of great importance in the pipeline. Basically we have to deal with three parts of features in this problem, namely those encoding the textual description, those encoding the picture layout, and the additional ones that jointly encode the relations between the description and the picture.
 
+\begin{table}[!h]
+	\caption{Features introduced to encode text, picture and them jointly. The bottom row indicates the size of a particular type of feature. Idf means this particular feature is reweighted by the idf of the associated token or category.}
+	\centering
+	\resizebox{\columnwidth}{!}{\begin{tabular}{cccccccc}
+		\toprule
+		 \multicolumn{2}{c}{text} & \multicolumn{5}{c}{picture} & joint \\
+		 \cmidrule(r){1-2} \cmidrule(r){3-7} \cmidrule(r){8-8}
+		  \multicolumn{2}{c}{\makecell{token\\frequency\\(idf)}} & \#~layers & \makecell{layer\\occurrence\\(idf)} & \multicolumn{2}{c}{\makecell{category\\occurrence\\(idf)}} & \makecell{category-category\\normalized similarity\\(idf)} & \makecell{token-category\\normalized similarity\\(idf)}\\
+		  \cmidrule{1-2} \cmidrule{5-6}
+		  unigram & bigram & & & character & surrounding & & \\
+		  \midrule
+		  135 & 163 & 1 & 4 & 16 & 17 & 272 & 9834 \\
+		 \bottomrule
+	\end{tabular}}
+	\label{tab: feat}
+\end{table}
+
 To deal with the text, we first introduce a tokenizer that transform a sentence into a series of keywords. Specifically, the sentence will be processed into tokens by the \emph{nltk} standard tokenizer, which are then fed into the \emph{nltk} standard POS tagger to identify their associated POS tags. Punctuations and stop words will be removed afterwards. A lemmatizer introduced by WordNet is used to lemmatize the tokens based on their POS tags. And the lemmas are further transformed into WordNet synsets, in aid of the calculations of similarities. Word sense disambiguation will not be mentioned here. Obtained synsets now serve as the keywords in our vocabulary. Unseen tokens will be discarded directly, which is obviously not reasonable and will be fixed later. Once we manage to represent a sentence using keywords included in the vocabulary, a simple Tf-idf vectorizer can be introduced to encode it. Both unigrams and bigrams will be used. The idfs of all keywords in the vocabulary will be scaled linearly such that they range from 0 to 1. As a reference, there will be in total 298 keywords in the vocabulary, including bigrams. The occurrences of keywords are biased prominently. In Fig. \ref{fig: text-occurrence} we list the keywords that occurs more than once. In fact, there are only 39 such keywords in the entire description corpus. 
 
 \begin{figure}[htbp]
   	\centering
 	\begin{subfigure}{.42\linewidth}
 	\centering
-	\includegraphics[width=\linewidth]{../Text2Scene/results/text-occurrence}
+	\includegraphics[width=\linewidth]{../results/text-occurrence}
 	\caption{Keywords that occurs more than once in the description corpus}
 	\label{fig: text-occurrence}
 	\end{subfigure}
 	\begin{subfigure}{.57\linewidth}
 	\centering
-	\includegraphics[width=\linewidth]{../Text2Scene/results/picture-occurrence}
+	\includegraphics[width=\linewidth]{../results/picture-occurrence}
 	\caption{Occurrences of category keywords across all pictures}
 	\label{fig: picture-occurrence}
 	\end{subfigure}
@@ -150,10 +168,19 @@ In the end, we need to jointly encode the pictures and the textual descriptions 
 
 \begin{figure}[htbp]
 	\centering
-	\includegraphics[width=0.5\textwidth]{../Text2Scene/results/cross-simi}
+	\includegraphics[width=0.5\textwidth]{../results/cross-simi}
 	\caption{The histogram of similarities between text keywords and picture keywords.}
 	\label{fig: cross-simi}
 \end{figure}
+
+\begin{figure}[htbp]
+  	\centering
+	\includegraphics[width=\linewidth]{../results/feat_val}
+	\caption{Noticeable features from pictures, descriptions and them jointly}
+	\label{fig: feat-val}
+\end{figure}
+
+As a reference, Table. \ref{tab: feat} lists the main features types and their size introduced by the above three encoders. Fig. \ref{fig: feat-val} shows some noticeable features in the three encoders respectively. Values of textual features are related to specific documents in terms of term frequency. Therefore here we show the top features that are penalized by \emph{idf}.
 
 \section{Model and evaluation}
 In order to fulfill the text to picture generation task, our idea is to train two discriminators, one to tell consistent description-picture pairs from inconsistent ones, and the other one to tell if a picture is fake or not. These two discriminators can be properly combined into a score function. Then given a piece of query text, we only have to find the one that is scored the highest among all the possible patterns that represent a picture.
@@ -169,7 +196,7 @@ We randomly choose about 90\% examples to train the discriminator, and test on t
 
 \begin{figure}[htbp]
 	\centering
-	\includegraphics[width=\textwidth]{../Text2Scene/results/ROC_idf*norm-simi2}
+	\includegraphics[width=\textwidth]{../results/ROC_idf*norm-simi2}
 	\caption{Precision-recall curve and ROC of the logistic regressor obtained on the test set in discriminating the consistency between a picture and a description}
 	\label{fig: consistent-metric}
 \end{figure}
@@ -177,13 +204,13 @@ We randomly choose about 90\% examples to train the discriminator, and test on t
 \begin{figure}[htbp]
 	\begin{subfigure}{0.5\linewidth}
 		\centering
-		\includegraphics[height=\textheight]{../Text2Scene/results/FEAT_idf*norm-simi2}
+		\includegraphics[height=\textheight]{../results/FEAT_idf*norm-simi2}
 		\caption{Most important features in discriminating the consistency between a picture and a description}
 		\label{fig: consistent-feat}
 	\end{subfigure}
 	\begin{subfigure}{0.48\linewidth}
 		\centering
-		\includegraphics[width=\linewidth]{../Text2Scene/results/realityFEAT_temp}
+		\includegraphics[width=\linewidth]{../results/realityFEAT_temp}
 		\caption{Most important features in discriminating the reasonability of a picture.}
 		\label{fig: real-feat}
 	\end{subfigure}
@@ -204,7 +231,7 @@ In Fig. \ref{fig: real-metric} we show the precision-recall curve and receiver o
 
 \begin{figure}
 	\centering
-	\includegraphics[width=\textwidth]{../Text2Scene/results/realityROC_temp}
+	\includegraphics[width=\textwidth]{../results/realityROC_temp}
 	\caption{Precision-recall curve and ROC of the logistic regressor obtained on the test set in discriminating the reasonability of a picture.}
 	\label{fig: real-metric}
 \end{figure}
@@ -221,7 +248,7 @@ One important thing left is to find a metric to evaluate the generated picture. 
 
 \begin{figure}
 	\centering
-	\includegraphics[width=0.5\textwidth]{../Text2Scene/results/generator_lamb-metric}
+	\includegraphics[width=0.5\textwidth]{../results/generator_lamb-metric}
 	\caption{The performance metric of the generator mF1, as the discriminator weight $\lambda$ varies}
 	\label{fig: lamb}
 \end{figure}
@@ -245,6 +272,45 @@ The final example is a rather difficult one. The description states ``A woman lo
 %\subsection{Hyperparameters?}
 %\subsection{Error analysis}
 
+\section{Ablation test}
+if remove non-joint features, significantly impair the performance
+
+\section{runtime}
+
+\begin{table}[t]
+	\caption{Runtime profile in a hierarchy. The number below each module indicates the cumulative time spent on it, on seconds. Each module here is called 668 times during a query. The number after for\_loop indicates the number of pairs this loop traversed.}
+	\centering
+	\resizebox{\columnwidth}{!}{\begin{tabular}{ccccccccccc}
+		\toprule
+		\multicolumn{11}{c}{query}\\
+		\multicolumn{11}{c}{4.092}\\
+		\midrule
+		 \multicolumn{8}{c}{\makecell{encoder\\(consistency discriminator)}} & \multicolumn{2}{c}{\makecell{encoder\\(reality discriminator)}} &... \\
+		 \multicolumn{8}{c}{3.508} & \multicolumn{2}{c}{0.344} & \\
+		 \cmidrule(r){1-8} \cmidrule(r){9-10}
+		 \multicolumn{3}{c}{\makecell{encoder\\(joint)}}  & \multicolumn{2}{c}{\makecell{encoder\\(text)}} & \multicolumn{2}{c}{\makecell{encoder\\(picture)}} & ... &  \multicolumn{2}{c}{\makecell{encoder\\(picture)}} &\\
+		  \multicolumn{3}{c}{1.972} & \multicolumn{2}{c}{0.730} & \multicolumn{2}{c}{0.344} & & \multicolumn{2}{c}{0.344} &\\		  
+		  \cmidrule{1-2} \cmidrule{3-4} \cmidrule{5-7} \cmidrule{9-10}
+		  for\_loop(33*298) & tokenizer & ... & tokenizer & vectorizer & for\_loop(16*17) & ... & & for\_loop(16*17) & ... &\\
+		  1.643 & 0.180 & & 0.427 & 0.303 & 0.285 & & & 0.180 & & \\
+		  
+		 \bottomrule
+	\end{tabular}}
+	\label{tab: feat}
+\end{table}
+
+Since we are using the exhaustive search, one textual query requires to traverse a search space of in total 668 possible pictures, which typically takes 3-6 seconds. The majority of the runtime is spent on encoding the query text and pictures. Our encoder takes a pair of description and picture as input, and is thus called 668 times, which means the description is repetitively encoded. Nevertheless, the time to encode the joint features, i.e. the pair between textual tokens and category keywords, accounts for the main part, mostly due to a redundant for-loop through all the feature pairs. The following table shows the most time-consuming functions.
+
+
+\section{future work}
+\begin{itemize}
+	\item remove non-joint features to make a baseline
+	\item synonym replacement for unseen words
+	\item extra similarities: cosine, jaccard, lch, wikipedia esa, word2vec
+\end{itemize}
+
+
+% rm some feature -> mF1
 %\section{Optimization}
 
 \end{document}

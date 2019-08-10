@@ -110,10 +110,10 @@ def ROC(y_true, y_prob, path='ROC'):
     # plt.show()
 
 
-def FEAT(dataset, clf, path='FEAT'):
+def FEAT(dataset, clf, path='FEAT', top=20):
     d = dict(zip(dataset.features_, clf.coef_.tolist()[0]))
     d_filter = filter(lambda x: x[1] != 0, d.items())
-    feat, valv = zip(*sorted(d_filter, key=lambda x: abs(x[1])))
+    feat, valv = zip(*sorted(d_filter, key=lambda x: abs(x[1]))[-top:])
     plt.figure(figsize=(4, round(len(feat)*0.25+2)))
     plt.barh(feat, valv)
     plt.savefig('results/%s' % path, bbox_inches='tight')

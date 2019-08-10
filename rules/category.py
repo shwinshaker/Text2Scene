@@ -26,7 +26,7 @@ surrouding_dict['room.n.01'] = {'object.n.01': ['furniture.n.01',
 surrouding_dict['landscape.n.01'] = {'city.n.01': ['street.n.01',
                                                  'building.n.01',
                                                  'vehicle.n.01'],
-                                   'nature.n.03':['park.n.02', 'wild.n.01']}
+                                   'nature.n.03':['park.n.02', 'wild.n.02']}
 # print(surrouding_dict)
 
 person_dict = dict()

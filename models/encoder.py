@@ -115,7 +115,7 @@ class CategEncoder():
         self.features_.extend(['_P_%s_' % k for k in self.prs_categ])
 
         # pair features
-        pair_features = ['_S_%s-P_%s_' % (ks, kp) for ks in self.srd_categ for kp in self.prs_categ]
+        pair_features = [self.__pairFeatureName(ks, kp) for ks in self.srd_categ for kp in self.prs_categ]
         self.features_.extend(pair_features)
 
         print('  - Build category level idf..')
@@ -163,6 +163,7 @@ class CategEncoder():
             self.root_idf_ = dict(zip(vocab_, idf_))
             # self.root_idf_ = dict(zip(vocab_, root_vectorizer.idf_))
 
+        print('  - Build category similarity..')
         simis = np.array([wrapRelaxedSimi(ks, kp) for ks in self.srd_categ for kp in self.prs_categ])
         self.simi_ = dict(zip(pair_features, simis))
         # simis standard normalizer
@@ -170,7 +171,15 @@ class CategEncoder():
             print('  - Build similarity normalizer..')
             self.simi_normalizer = Normalizer()
             # self.simi_normalizer.fit(simis)
+            # if simi=0, mostly cannot measure, cannot say they are totally different
             self.simi_normalizer.fit([s for s in simis if s != 0])
+            norm_simis = [self.simi_normalizer.transform(s) if s!=0 else 0 for s in simis]
+            self.norm_simi_= dict(zip(pair_features, norm_simis))
+
+    def __pairFeatureName(self, ks, kp):
+        assert(ks in self.srd_categ)
+        assert(kp in self.prs_categ)
+        return '_S_%s-P_%s_' % (ks, kp)
 
     def encode(self, layer_names):
 
@@ -273,18 +282,45 @@ class CategEncoder():
             prs_keys = getNestedKeyWithCode(person_dict, subcode)
 
         ## using normalized similarities yields similar performance
+        ## use hash to speed up similarity fetch
+        ## Error resolved: normaliz erroneously scales the 0 simis
         if self.idf and self.norm_simi:
-            return [self.idf_[ks] * self.idf_[kp] * self.simi_normalizer.transform(wrapRelaxedSimi(ks, kp)) if ks in srd_keys and kp in prs_keys else 0 for ks in self.srd_categ for kp in self.prs_categ]
+            # return [self.idf_[ks] * self.idf_[kp] * self.simi_normalizer.transform(wrapRelaxedSimi(ks, kp)) if ks in srd_keys and kp in prs_keys else 0 for ks in self.srd_categ for kp in self.prs_categ]
+            return [self.idf_[ks] * self.idf_[kp] * self.norm_simi_[self.__pairFeatureName(ks, kp)] for ks in self.srd_categ for kp in self.prs_categ]
 
         if self.idf:
-            return [self.idf_[ks] * self.idf_[kp] * wrapRelaxedSimi(ks, kp) if ks in srd_keys and kp in prs_keys else 0 for ks in self.srd_categ for kp in self.prs_categ]
+            # return [self.idf_[ks] * self.idf_[kp] * wrapRelaxedSimi(ks, kp) if ks in srd_keys and kp in prs_keys else 0 for ks in self.srd_categ for kp in self.prs_categ]
+            return [self.idf_[ks] * self.idf_[kp] * self.simi_[self.__pairFeatureName(ks, kp)] for ks in self.srd_categ for kp in self.prs_categ]
 
         if self.norm_simi:
-            return [self.simi_normalizer.transform(wrapRelaxedSimi(ks, kp)) if ks in srd_keys and kp in prs_keys else 0 for ks in self.srd_categ for kp in self.prs_categ]
+            # return [self.simi_normalizer.transform(wrapRelaxedSimi(ks, kp)) if ks in srd_keys and kp in prs_keys else 0 for ks in self.srd_categ for kp in self.prs_categ]
+            return [self.norm_simi_[self.__pairFeatureName(ks, kp)] for ks in self.srd_categ for kp in self.prs_categ]
 
-        return [wrapRelaxedSimi(ks, kp) if ks in srd_keys and kp in prs_keys else 0 for ks in self.srd_categ for kp in self.prs_categ]
+        # return [wrapRelaxedSimi(ks, kp) if ks in srd_keys and kp in prs_keys else 0 for ks in self.srd_categ for kp in self.prs_categ]
+        return [self.simi_[self.__pairFeatureName(ks, kp)] for ks in self.srd_categ for kp in self.prs_categ]
 
+    def getFeatureValues(self):
+        feat_vals = [4] # maximum 4 layers
 
+        # root key features and category single features
+        if self.idf:
+            feat_vals.extend([self.root_idf_[k] for k in self.root_category_])
+            feat_vals.extend([self.idf_[k] for k in self.category_])
+        else:
+            feat_vals.extend([1 for k in self.root_category_])
+            feat_vals.extend([1 for k in self.category_])
+
+        # cross simi
+        if self.idf and self.norm_simi:
+            feat_vals.extend([self.idf_[ks] * self.idf_[kp] * self.norm_simi_[self.__pairFeatureName(ks, kp)] for ks in self.srd_categ for kp in self.prs_categ])
+        elif self.idf:
+            feat_vals.extend([self.idf_[ks] * self.idf_[kp] * self.simi_[self.__pairFeatureName(ks, kp)] for ks in self.srd_categ for kp in self.prs_categ])
+        elif self.norm_simi:
+            feat_vals.extend([self.norm_simi_[self.__pairFeatureName(ks, kp)] for ks in self.srd_categ for kp in self.prs_categ])
+        else:
+            feat_vals.extend([self.simi_[self.__pairFeatureName(ks, kp)] for ks in self.srd_categ for kp in self.prs_categ])
+
+        return dict(zip(self.features_, feat_vals))
 
 
 ### text encoder
@@ -334,6 +370,10 @@ class TfidfEncoder():
         # vec = self.vectorizer.transform([tokens]).toarray()[0]
         # return np.append(vec, len(tokens))
 
+    def getFeatureValues(self):
+        # the features of text encode are idfs, if consider no tfs
+        return self.idf_
+
 
 ### joint encoder
 import numpy as np
@@ -358,10 +398,12 @@ class SimiEncoder():
         ### be extremely careful here for the order of feature names
         self.features_ = []
         # self.features_.append('_length_')
-        self.features_.extend(['_S_%s-%s_' % (k, t) for k in img_encoder.srd_categ for t in txt_encoder.vocab_])
-        self.features_.extend(['_P_%s-%s_' % (k, t) for k in img_encoder.prs_categ for t in txt_encoder.vocab_])
+        # self.features_.extend(['_S_%s-%s_' % (k, t) for k in img_encoder.srd_categ for t in txt_encoder.vocab_])
+        # self.features_.extend(['_P_%s-%s_' % (k, t) for k in img_encoder.prs_categ for t in txt_encoder.vocab_])
+        self.features_.extend([self.__joint(k, t) for k in img_encoder.category_ for t in txt_encoder.vocab_])
 
         # simi dict
+        print('  - Build token-category similarities..')
         simis = [wrapRelaxedSimi(k, t) for k in self.img_encoder.category_ for t in self.txt_encoder.vocab_]
         self.simi_ = dict(zip(self.features_, simis))
 
@@ -373,6 +415,54 @@ class SimiEncoder():
             ## should we filter out 0? yep, too many 0, otherwise normalize takes no effects
             ### filtering out 0 strongly reduces the performance
             self.simi_normalizer.fit([s for s in simis if s != 0])
+            norm_simis = [self.simi_normalizer.transform(s) if s!=0 else 0 for s in simis]
+            self.norm_simi_= dict(zip(self.features_, norm_simis))
+
+    def __joint(self, k, t):
+        """
+        format the joint feature name given a token and a category
+        """
+        assert(k in self.img_encoder.category_), k
+        assert(t in self.txt_encoder.vocab_), t
+        if k in self.img_encoder.srd_categ:
+            return '_S_%s-%s_' % (k, t)
+        if k in self.img_encoder.prs_categ:
+            return '_P_%s-%s_' % (k, t)
+        raise ValueError('invalid category name %s' % k)
+
+    def for_for(self, keywords, tokens):
+        feats = []
+        # feats.append(abs(len(keywords) - len(tokens)))
+        for k in self.img_encoder.category_:
+            for t in self.txt_encoder.vocab_:
+                if k in keywords and t in tokens:
+                    if self.simi:
+                        # feat = wrapRelaxedSimi(k, t)
+                        # if self.norm_simi:
+                        #     # if simi = 0 means unavailable simi, skip it
+                        #     if feat != 0:
+                        #         feat = self.simi_normalizer.transform(feat)
+                        if self.norm_simi:
+                            feat = self.norm_simi_[self.__joint(k, t)]
+                        else:
+                            feat = self.simi_[self.__joint(k, t)]
+                    else:
+                        feat = 1
+                    if self.text_idf:
+                        feat *= self.txt_encoder.idf_[t]**self.suppress_freq
+                    if self.categ_idf:
+                        feat *= self.img_encoder.idf_[k]**self.suppress_freq
+                    feats.append(feat)
+                else:
+                    feats.append(0)
+        return feats
+
+    def for_for(self, keywords, tokens):
+        feats = [0] * (len(self.img_encoder.category_) * len(self.txt_encoder.vocab_))
+        # for 
+        #  for 
+        #   index
+        # ....
 
     def encode(self, layer_names, sentence):
         assert(isinstance(layer_names, list))
@@ -383,27 +473,52 @@ class SimiEncoder():
         keywords = self.img_encoder.layer2keyword(layer_names)
         tokens = self.txt_encoder.tokenizer(sentence)
 
+        return self.for_for(keywords, tokens)
+
+        # feats = []
+        # # feats.append(abs(len(keywords) - len(tokens)))
+        # for k in self.img_encoder.category_:
+        #     for t in self.txt_encoder.vocab_:
+        #         if k in keywords and t in tokens:
+        #             if self.simi:
+        #                 # feat = wrapRelaxedSimi(k, t)
+        #                 # if self.norm_simi:
+        #                 #     # if simi = 0 means unavailable simi, skip it
+        #                 #     if feat != 0:
+        #                 #         feat = self.simi_normalizer.transform(feat)
+        #                 if self.norm_simi:
+        #                     feat = self.norm_simi_[self.__joint(k, t)]
+        #                 else:
+        #                     feat = self.simi_[self.__joint(k, t)]
+        #             else:
+        #                 feat = 1
+        #             if self.text_idf:
+        #                 feat *= self.txt_encoder.idf_[t]**self.suppress_freq
+        #             if self.categ_idf:
+        #                 feat *= self.img_encoder.idf_[k]**self.suppress_freq
+        #             feats.append(feat)
+        #         else:
+        #             feats.append(0)
+        # return np.array(feats)
+
+    def getFeatureValues(self):
         feats = []
-        # feats.append(abs(len(keywords) - len(tokens)))
         for k in self.img_encoder.category_:
             for t in self.txt_encoder.vocab_:
-                if k in keywords and t in tokens:
-                    if self.simi:
-                        feat = wrapRelaxedSimi(k, t)
-                        if self.norm_simi:
-                            # if simi = 0 means unavailable simi, skip it
-                            if feat != 0:
-                                feat = self.simi_normalizer.transform(feat)
+                if self.simi:
+                    if self.norm_simi:
+                        feat = self.norm_simi_[self.__joint(k, t)]
                     else:
-                        feat = 1
-                    if self.text_idf:
-                        feat *= self.txt_encoder.idf_[t]**self.suppress_freq
-                    if self.categ_idf:
-                        feat *= self.img_encoder.idf_[k]**self.suppress_freq
-                    feats.append(feat)
+                        feat = self.simi_[self.__joint(k, t)]
                 else:
-                    feats.append(0)
-        return np.array(feats)
+                    feat = 1
+                if self.text_idf:
+                    feat *= self.txt_encoder.idf_[t]**self.suppress_freq
+                if self.categ_idf:
+                    feat *= self.img_encoder.idf_[k]**self.suppress_freq
+                feats.append(feat)
+
+        return dict(zip(self.features_, feats))
 
         # return np.array(flattenNested([sentSimi(tokens, k, self.txt_encoder.vocab_) if k in keywords else sentSimi(tokens, None, self.txt_encoder.vocab_) for k in self.img_encoder.category_]))
         # return np.array([1 if k in keywords and t in tokens else 0 for k in self.img_encoder.category_ for t in self.txt_encoder.vocab_])
@@ -417,6 +532,5 @@ class SimiEncoder():
         # return np.array([self.simi_normalizer.transform(wrapRelaxedSimi(k, t)) if k in keywords and t in tokens else 0 for k in self.img_encoder.category_ for t in self.txt_encoder.vocab_])
        #  return np.array([wrapRelaxedSimi(k, t) if k in keywords and t in tokens else 0 for k in self.img_encoder.category_ for t in self.txt_encoder.vocab_])
         # return np.array([self.txt_encoder.idf_[t] * self.img_encoder.idf_[k] * self.simi_normalizer.transform(wrapRelaxedSimi(k, t)) if k in keywords and t in tokens else 0 for k in self.img_encoder.category_ for t in self.txt_encoder.vocab_])
-
 
 
