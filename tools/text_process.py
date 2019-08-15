@@ -9,6 +9,8 @@ from nltk.corpus import stopwords
 import string
 import warnings
 
+from tools.instance import Node
+
 ### text processing
 class LemmaTokenizer(object):
     def __init__(self):
@@ -69,8 +71,8 @@ class LemmaTokenizer(object):
             ### actually lemmatize calls morphy
             ### rule-based suffix detachment. Eg. corpora -> corpus
             # lemma = wn.morphy(self.corrector(token), tag)
-            # return lemma
-            return self.synsetting(lemma, tag)
+            return Node(lemma, tag)
+            # return self.synsetting(lemma, tag)
 
         # remove stopwords
         if token in self.stopwords:
@@ -80,7 +82,7 @@ class LemmaTokenizer(object):
         if token in self.punctuation:
             return None
 
-        return self.synsetting(token)
+        return Node(token, 'UNK') #self.synsetting(token)
 
     def __filter(self, tokens):
         return [t for t in tokens if t]

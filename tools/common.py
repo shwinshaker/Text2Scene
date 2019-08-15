@@ -137,6 +137,43 @@ def packAppend(l, append_l):
 
 ### Nested dictionary
 
+def absorbNestedDict(dic1, dic2):
+    """
+    Input dictionary should be nested dictionary with set as leaf
+        2.0
+    """
+
+    for key in dic2:
+        if key not in dic1:
+            if isinstance(dic1, dict):
+                dic1[key] = dic2[key]
+            elif isinstance(dic1, set):
+                # dic1.append(key)
+                dic1.add(key)
+        else:
+            if isinstance(dic1, dict):
+                absorbNestedDict(dic1[key], dic2[key])
+
+def ravel(entities_):
+    """
+    ravel a dict of dict to a node, with leaf as int
+    """
+    from tools.instance import Node
+
+    assert(isinstance(entities_, dict))
+    type0 = list(entities_.keys())[0]
+    assert(isinstance(entities_[type0], dict))
+    key0 = list(entities_[type0].keys())[0]
+    assert(isinstance(entities_[type0][key0], int))
+
+    ravel_ = set()
+    for type_ in entities_:
+        for key in entities_[type_]:
+            node = Node(key, type_, count=entities_[type_][key])
+            assert(node not in ravel_)
+            ravel_.add(node)
+    return ravel_
+
 def getNestedKey(obj):
     """
     recursion wrapper of getNestedKey_
@@ -298,3 +335,14 @@ def getFiles(path, ext, index=None):
 def getMaterial(layer):
     l = glob.glob('material/%s*.png' % layer)
     return random.choice(l)
+
+def static_vars(**kwargs):
+    """
+    Decoator to help function define static variables
+        E.g. add a static counter: @static_vars(count=0)
+    """
+    def decorate(func):
+        for k in kwargs:
+            setattr(func, k, kwargs[k])
+        return func
+    return decorate
