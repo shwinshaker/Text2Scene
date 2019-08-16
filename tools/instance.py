@@ -84,6 +84,7 @@ class Picture:
         # should consider overlapping order here?
         # but it should make no difference if ravel the keywords as features
         # lets omit it for now
+        # ! the order of layers doesn't matter
         return self.triple_set_ == other.triple_set_
 
     def __hash__(self):
