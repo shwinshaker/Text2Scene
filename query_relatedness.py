@@ -9,6 +9,9 @@ from tools.knowledge import LayerBase, TextBase
 
 @static_vars(count_query=0, count_stored=0)
 def query(token, layerbase, relateDict):
+    """
+    Caveats: conceptNet doesn't differ pos in relatedness
+    """
 
     for keyword in layerbase.keywords_:
         # seen
