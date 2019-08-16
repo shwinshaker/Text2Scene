@@ -1,6 +1,6 @@
 #!./env python
 
-from tools.text_process import LemmaTokenizer
+from tools.text_process import SpacyLemmaTokenizer
 from tools.common import ravel
 from tools.instance import Node
 from tools.image_process import LayerName, getLayerNames
@@ -32,7 +32,7 @@ class LayerBase():
 class TextBase():
     def __init__(self):
         vocab = set()
-        tokenizer = LemmaTokenizer()
+        tokenizer = SpacyLemmaTokenizer()
         for txt in glob.glob('text/*.txt'):
             with open(txt) as f:
                 text = f.read()

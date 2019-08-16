@@ -6,10 +6,60 @@ from nltk.stem import WordNetLemmatizer, PorterStemmer
 from nltk import pos_tag
 from nltk.corpus import wordnet as wn
 from nltk.corpus import stopwords
+
+import spacy # use spacy now for sophicated tagging
+from spacy.lemmatizer import Lemmatizer
+from spacy.lang.en import LEMMA_INDEX, LEMMA_EXC, LEMMA_RULES
+
 import string
 import warnings
 
 from tools.instance import Node
+
+class SpacyLemmaTokenizer:
+
+    """
+    rewrite this... spacy is too damned simple
+    """
+    def __init__(self):
+        self.nlp = spacy.load("en_core_web_sm")
+        self.lemmatizer = Lemmatizer(LEMMA_INDEX, LEMMA_EXC, LEMMA_RULES)
+
+    def penn_to_lemma(self, tag):
+        """
+        Convert output of pos tagger to wordnet tags
+        Only nouns, verbs, adjectives and adverbs will be kept.
+        """
+        if tag.startswith('J'):
+            return 'ADJ'
+        elif tag.startswith('N'):
+            return 'NOUN'
+        elif tag.startswith('R'):
+            return 'ADV'
+        elif tag.startswith('V'):
+            return 'VERB'
+        return None
+
+    def le_to_wn(self, tag):
+        return tag
+        dic = {'ADJ': wn.ADJ,
+               'NOUN': wn.NOUN,
+               'ADV': wn.ADV,
+               'VERB': wn.VERB}
+        return dic[tag]
+
+    def lemmatize(self, token, tag):
+        lemma_tag = self.penn_to_lemma(tag)
+        if lemma_tag is None: return Node(token, tag) #Node(token, 'UNK')
+        return Node(self.lemmatizer(token, lemma_tag)[0], self.le_to_wn(lemma_tag))
+
+    def __filter(self, token):
+        return token.is_stop or token.is_punct
+
+    def __call__(self, sentence):
+        doc = self.nlp(sentence.strip('\n'))
+        return [self.lemmatize(token.text, token.tag_) for token in doc if not self.__filter(token)]
+
 
 ### text processing
 class LemmaTokenizer(object):
@@ -24,6 +74,7 @@ class LemmaTokenizer(object):
 
         self.stopwords = stopwords.words('english')
         self.punctuation = string.punctuation
+
 
     def corrector(self, token):
         # todo
