@@ -8,37 +8,68 @@ from tools.image_process import LayerName, getLayerNames
 import glob
 
 class LayerBase():
-    def __init__(self):
+    """
+    layer Base knowledge, show only built on train set!
+    """
+    def __init__(self, filenames=[],
+                 img_dir='images',
+                 ext='.svg'):
 
-        layername = LayerName()
-        for svg in glob.glob('images/*.svg'):
-            for layer in getLayerNames(svg):
-                layername.absorb(LayerName(layer))
-        self.entities_ = layername.entities_
-        # self.keywords_ = sorted(list(ravel(layername.entities_)),
-        #                           key=lambda n: (n.t, n.attr))
-        self.keywords_ = sorted(ravel(layername.entities_))
+        """
+        need other dictionary to save the layer frequency
+        """
+        if not filenames:
+            filenames = glob.glob('%s/*%s' % (img_dir, ext))
+        else:
+            filenames = ['%s/%s%s' % (img_dir, name, ext) for name in filenames]
 
-    # def index(self, keyword, attr):
-    #     return self.nodes_.index(Node(keyword, attr))
+        self.layer_merge_ = LayerName()
+        self.pictures_ = []
+        for svg in filenames:
+            picture = Picture(svg)
+            # for layer in getLayerNames(svg):
+            #     layername = LayerName(layer)
+            #     self.layers_.append(layername)
+            self.layer_merge_.absorb(picture.layer_merge_)
+            self.pictures_.append(picture)
+        self.entities_ = self.layer_merge_.entities_
+
+        # picture vocab contains no dupicates
+        self.pic_vocab_ = set(self.pictures_)
+
+        # layer vocab contains no dupicates
+        self.layer_vocab_ = set([layer for picture in self.pictures_ for layer in picture.layers_])
+
+        # keyword vocab contains no dupicates
+        # here we explicitly need the order the make sure results reproducable
+        ## such as index and line up features
+        self.vocab_ = sorted(ravel(self.layer_merge_.entities_))
 
     def index(self, keyword):
         assert(isinstance(keyword, Node))
-        return self.keywords_.index(keyword)
+        return self.vocab_.index(keyword)
 
     def __len__(self):
-        return len(self.keywords_)
+        return len(self.vocab_)
+
 
 class TextBase():
-    def __init__(self):
-        vocab = set()
-        tokenizer = SpacyLemmaTokenizer()
-        for txt in glob.glob('text/*.txt'):
-            with open(txt) as f:
-                text = f.read()
-            tokens = tokenizer(text)
-            vocab |= set(tokens)
-        self.vocab_ = sorted(vocab)
+    def __init__(self, filenames=[],
+                 txt_dir='text',
+                 ext='.txt'):
+
+        if not filenames:
+            filenames = glob.glob('%s/*%s' % (txt_dir, ext))
+        else:
+            filenames = ['%s/%s%s' % (txt_dir, name, ext) for name in filenames]
+
+        self.vocab_ = set()
+        self.doc_vocab_ = set()
+        for txt in filenames:
+            doc = Description(txt)
+            self.vocab_ |= doc.vocab_
+            self.doc_vocab_.add(doc)
+        self.vocab_ = sorted(self.vocab_)
 
     def index(self, token):
         assert(isinstance(token, Node))
@@ -46,3 +77,6 @@ class TextBase():
 
     def __len__(self):
         return len(self.vocab_)
+
+    def __iter__(self):
+        return iter(self.vocab_)
