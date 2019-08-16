@@ -43,6 +43,8 @@ def rectifyLayer(path, li):
     """
     return li
 
+
+## 2.0
 def getLayerNames(path):
     """
     Get the name of each layer in the image
@@ -97,6 +99,7 @@ class LayerName:
     """
     given layer Name, return nested entities list
     E.g. subj(act[obj]) -> {'subj': {'act': ['obj']}}
+        # todo: convert resulting defaultdict to dict to prevent change
     """
     def __init__(self, s=''):
         assert(isinstance(s, str))

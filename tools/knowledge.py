@@ -3,7 +3,8 @@
 from tools.text_process import SpacyLemmaTokenizer
 from tools.common import ravel
 from tools.instance import Node
-from tools.image_process import LayerName, getLayerNames
+from tools.containers import Picture, Description
+from tools.image_process import LayerName #, getLayerNames
 
 import glob
 

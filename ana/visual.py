@@ -14,7 +14,7 @@ def _acc(true, pred):
 def _F1(prec, recall):
     return 2 * prec * recall / (prec + recall)
 
-def STAT(y_true, y_prob, path='STAT'):
+def STAT(y_true, y_prob, save=True, path='STAT'):
 
     y_pred = y_prob > 0.5
 
@@ -45,7 +45,9 @@ def STAT(y_true, y_prob, path='STAT'):
     plt.xlabel('Predict probs')
     plt.ylabel('Counts')
     plt.xlim([0, 1])
-    plt.savefig('results/%s' % path)
+
+    if save:
+        plt.savefig('results/%s' % path)
     # plt.show()
 
 def ROC(y_true, y_prob, path='ROC'):
