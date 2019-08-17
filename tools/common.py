@@ -158,6 +158,16 @@ def absorbNestedDict(dic1, dic2):
     assert(isinstance(dic1, dict) or isinstance(dic1, set)), type(dic1)
     assert(isinstance(dic2, dict) or isinstance(dic2, set)), type(dic2)
 
+    def __incre_key(dic, key):
+        if isinstance(dic, dict):
+            l_keys = list(dic.keys())
+        elif isinstance(dic, set):
+            l_keys = list(dic)
+        else:
+            raise TypeError
+        k = l_keys[l_keys.index(key)]
+        k.count += key.count
+
     for key in dic2:
         if key not in dic1:
             if isinstance(dic1, dict):
@@ -165,9 +175,17 @@ def absorbNestedDict(dic1, dic2):
             elif isinstance(dic1, set):
                 # dic1.append(key)
                 dic1.add(key)
+            else:
+                raise TypeError(dic1)
         else:
             if isinstance(dic1, dict):
+                # absorbNestedDict(dic1[key], dic2[key])
+                __incre_key(dic1, key)
                 absorbNestedDict(dic1[key], dic2[key])
+            elif isinstance(dic1, set):
+                __incre_key(dic1, key)
+            else:
+                raise TypeError(dic1)
 
 def ravel(entities_):
     """

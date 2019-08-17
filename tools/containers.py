@@ -307,14 +307,13 @@ class LayerName:
 
         entities = defaultdict(lambda: defaultdict(int))
         for subj in self.nested_entities_:
-            # to-do
-            sub = subj # re.sub(r'\d*$','',subj)
-            entities['subj'][sub] += 1 #.add(subj)
+            assert(subj not in entities['subj']), subj
+            entities['subj'][subj] += subj.count #.add(subj)
             for act in self.nested_entities_[subj]:
                 # same actions in different subject will be counted separately
-                entities['act'][act] += 1 #.add(act)
+                entities['act'][act] += act.count #.add(act)
                 for obj in self.nested_entities_[subj][act]:
-                    entities['obj'][obj] += 1 #.add(obj)
+                    entities['obj'][obj] += obj.count #.add(obj)
         return ddict2dict(entities)
 
     def _get_triples(self):
@@ -336,6 +335,12 @@ class LayerName:
         return tuple(triples_)
 
     def absorb(self, other_, subj_exclusion=False):
+        """
+        absorb other layers into this layer, merge entities accordingly
+        """
+
+        if not other_.nested_entities_:
+            raise RuntimeError('Can not absorb an empty layer!')
 
         # merge nested entites
         if not subj_exclusion:
@@ -351,7 +356,10 @@ class LayerName:
         else:
             """
             now are using dict of dict of set, may should do some modification here
+                todo: modify this part since we now introduce the id and count of node
+                      simply add the key because id are exclusive
             """
+            raise NotImplementedError('Exclusion absorption needs recheck')
             for subj in other.nested_entities_:
                 sub = re.sub(r'\d*$','',subj)
                 if sub not in self.nested_entities_:
@@ -363,18 +371,26 @@ class LayerName:
                             count += 1
                     self.nested_entities_['%s%i' % (sub, count+1)] = other.nested_entities_[subj]
 
-        # merge entities
-        # show new entities list
-        # self.entities_ = self.__get_entities()
-        for type_ in other.entities_:
-            assert(type_ in self.entities_), (type_, self.entities_.keys())
-            for entity in other.entities_[type_]:
-                if entity not in self.entities_[type_]:
-                    self.entities_[type_][entity] = 0
-                self.entities_[type_][entity] += other.entities_[type_][entity]
-        # self.entities_ = ddict2dict(self.entities_)
+        # # merge entities
+        # # show new entities list
+        # # self.entities_ = self.__get_entities()
+        # for type_ in other.entities_:
+        #     assert(type_ in self.entities_), (type_, self.entities_.keys())
+        #     for entity in other.entities_[type_]:
+        #         if entity not in self.entities_[type_]:
+        #             self.entities_[type_][entity] = 0
+        #         self.entities_[type_][entity] += other.entities_[type_][entity]
+        # # self.entities_ = ddict2dict(self.entities_)
 
-        # regenrate tuples
+        # ----------
+        # Aug 17: now we incorporate count information into nested_entities_
+        #         other variables can simply re-gen
+        #         means only need to maintain one variable
+        # -----------
+        # regenerate entities
+        self.entities_ = self._get_entities()
+
+        # regenerate tuples
         self.triples_ = self._get_triples()
 
     def collapse_subj(self):
@@ -383,14 +399,16 @@ class LayerName:
             # todo: the right way is to add count when merge subjects
             #       then no need to explicitly merge entities_
         """
+        def __count_dups(sub):
+            return [n._reset() for n in self.nested_entities_].count(sub)
+
         # collapse nested dict
         # nested_entities_clps_ = defaultdict(lambda: defaultdict(list))
         nested_entities_clps_ = defaultdict(lambda: defaultdict(set))
         for subj in self.nested_entities_:
             if subj.i > 0:
                 sub = subj._reset()
-            # if re.match(r'^\w+\d+$', subj):
-            #     sub = re.sub(r'\d*$', '', subj)
+                sub.count = __count_dups(sub) # add count
                 absorbNestedDict(nested_entities_clps_[sub],
                                  self.nested_entities_[subj])
             else:
@@ -400,21 +418,24 @@ class LayerName:
         # regenerate triples
         self.triples_ = self._get_triples()
 
-        # collapse dict, such that count are summed
-        entities_clps_ = defaultdict(lambda: defaultdict(int))
-        entities_clps_['subj'] = defaultdict(int)
-        entities_clps_['act'] = defaultdict(int)
-        entities_clps_['obj'] = defaultdict(int)
-        for type_ in self.entities_:
-            for entity in self.entities_[type_]:
-                # if re.match(r'^\w+\d+$', entity):
-                #     sub = re.sub(r'\d*$', '', entity)
-                if entity.i > 0:
-                    sub = entity._reset()
-                    entities_clps_[type_][sub] += self.entities_[type_][entity]
-                else:
-                    entities_clps_[type_][entity] = self.entities_[type_][entity]
-        self.entities_ = ddict2dict(entities_clps_)
+        # regenrate entities
+        self.entities_ = self._get_entities()
+
+        # # collapse dict, such that count are summed
+        # entities_clps_ = defaultdict(lambda: defaultdict(int))
+        # entities_clps_['subj'] = defaultdict(int)
+        # entities_clps_['act'] = defaultdict(int)
+        # entities_clps_['obj'] = defaultdict(int)
+        # for type_ in self.entities_:
+        #     for entity in self.entities_[type_]:
+        #         # if re.match(r'^\w+\d+$', entity):
+        #         #     sub = re.sub(r'\d*$', '', entity)
+        #         if entity.i > 0:
+        #             sub = entity._reset()
+        #             entities_clps_[type_][sub] += self.entities_[type_][entity]
+        #         else:
+        #             entities_clps_[type_][entity] = self.entities_[type_][entity]
+        # self.entities_ = ddict2dict(entities_clps_)
 
     def ravel(self):
         """
@@ -438,7 +459,8 @@ class LayerName:
     def plot(self, save_fig=False):
 
         # regain entities, because merge entities are sets
-        entities_ = self._get_entities()
+        # entities_ = self._get_entities()
+        entities_ = self.entities_
 
         len_subj = len(entities_['subj'])
         len_act = len(entities_['act'])
