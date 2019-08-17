@@ -1,10 +1,10 @@
 #!./env python
 
-from tools.text_process import SpacyLemmaTokenizer
 from tools.common import ravel
 from tools.instance import Node
 from tools.containers import Picture, Description
 from tools.image_process import LayerName #, getLayerNames
+from tools.common import ddict2dict
 
 import glob
 
@@ -24,16 +24,21 @@ class LayerBase():
         else:
             filenames = ['%s/%s%s' % (img_dir, name, ext) for name in filenames]
 
-        self.layer_merge_ = LayerName()
+        # self.layer_merge_ = LayerName()
+        layer_merge_ = LayerName()
         self.pictures_ = []
         for svg in filenames:
             picture = Picture(svg)
             # for layer in getLayerNames(svg):
             #     layername = LayerName(layer)
             #     self.layers_.append(layername)
-            self.layer_merge_.absorb(picture.layer_merge_)
+            # self.layer_merge_.absorb(picture.layer_merge_)
+            layer_merge_.absorb(picture.layer_merge_)
             self.pictures_.append(picture)
-        self.entities_ = self.layer_merge_.entities_
+        # self.entities_ = self.layer_merge_.entities_
+        # prevent empty query change the key
+        self.entities_ = ddict2dict(layer_merge_.entities_)
+        self.collocations_ = ddict2dict(layer_merge_.nested_entities_)
 
         # picture vocab contains no dupicates
         self.pic_vocab_ = set(self.pictures_)
@@ -44,7 +49,7 @@ class LayerBase():
         # keyword vocab contains no dupicates
         # here we explicitly need the order the make sure results reproducable
         ## such as index and line up features
-        self.vocab_ = sorted(ravel(self.layer_merge_.entities_))
+        self.vocab_ = sorted(ravel(self.entities_))
 
     def index(self, keyword):
         assert(isinstance(keyword, Node))

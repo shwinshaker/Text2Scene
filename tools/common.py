@@ -137,6 +137,16 @@ def packAppend(l, append_l):
 
 ### Nested dictionary
 
+def ddict2dict(d):
+    """
+    turn a nested defaultdict into dict
+        such that unseen key will return keyError
+    """
+    for k, v in d.items():
+        if isinstance(v, dict):
+            d[k] = ddict2dict(v)
+    return dict(d)
+
 def absorbNestedDict(dic1, dic2):
     """
     Input dictionary should be nested dictionary with set as leaf

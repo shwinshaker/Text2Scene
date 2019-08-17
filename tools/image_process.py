@@ -119,6 +119,9 @@ class LayerName:
         """
         return self.nested_entities_ == other.nested_entities_
 
+    def __lt__(self, other):
+        return self.s < other.s
+
     def __hash__(self):
         return hash(self.triples_)
 
@@ -274,7 +277,7 @@ class LayerName:
             self.collapse_subj()
             other.collapse_subj()
             absorbNestedDict(self.nested_entities_,
-                               other.nested_entities_)
+                             other.nested_entities_)
 
         else:
             """

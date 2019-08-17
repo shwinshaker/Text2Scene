@@ -45,6 +45,9 @@ class Picture:
         """
         return '; '.join(self.layernames_)
 
+    def __lt__(self, other):
+        return self.__repr__() < other.__repr__()
+
     def __eq__(self, other):
         # should consider overlapping order here?
         # but it should make no difference if ravel the keywords as features
