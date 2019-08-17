@@ -2,8 +2,7 @@
 
 from tools.common import ravel
 from tools.instance import Node
-from tools.containers import Picture, Description
-from tools.image_process import LayerName #, getLayerNames
+from tools.containers import Picture, Description, LayerName
 from tools.common import ddict2dict
 
 import glob
@@ -37,8 +36,8 @@ class LayerBase():
             self.pictures_.append(picture)
         # self.entities_ = self.layer_merge_.entities_
         # prevent empty query change the key
-        self.entities_ = ddict2dict(layer_merge_.entities_)
-        self.collocations_ = ddict2dict(layer_merge_.nested_entities_)
+        self.entities_ = layer_merge_.entities_
+        self.collocations_ = layer_merge_.nested_entities_
 
         # picture vocab contains no dupicates
         self.pic_vocab_ = set(self.pictures_)
@@ -50,6 +49,8 @@ class LayerBase():
         # here we explicitly need the order the make sure results reproducable
         ## such as index and line up features
         self.vocab_ = sorted(ravel(self.entities_))
+
+        self.plot = layer_merge_.plot
 
     def index(self, keyword):
         assert(isinstance(keyword, Node))

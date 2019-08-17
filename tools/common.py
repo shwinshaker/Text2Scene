@@ -147,11 +147,16 @@ def ddict2dict(d):
             d[k] = ddict2dict(v)
     return dict(d)
 
+def dic2ddict(d):
+    pass
+
 def absorbNestedDict(dic1, dic2):
     """
     Input dictionary should be nested dictionary with set as leaf
         2.0
     """
+    assert(isinstance(dic1, dict) or isinstance(dic1, set)), type(dic1)
+    assert(isinstance(dic2, dict) or isinstance(dic2, set)), type(dic2)
 
     for key in dic2:
         if key not in dic1:
