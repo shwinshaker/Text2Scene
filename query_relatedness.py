@@ -38,6 +38,9 @@ def query_simi(token, keyword):
     """
     Caveats: conceptNet doesn't differ pos in relatedness
     """
+    assert(isinstance(token, str))
+    assert(isinstance(keyword, str))
+
     with open('relateDict.pkl', 'rb') as f:
         # relateDict = dill.load(f)
         relateDict = pickle.load(f)

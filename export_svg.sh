@@ -12,6 +12,7 @@ if [ -z "$1" ];then
 fi
 
 pattern='^A' # identification number of a valid layer
+# pattern='^#' # identification number of a valid layer
 fileName=$1
 imageDir=$2 #"images"
 baseName=${fileName%.*}
