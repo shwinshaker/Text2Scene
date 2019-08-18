@@ -49,6 +49,9 @@ def getLayerNames(path):
         first check the id attribute of <svg>
         then check the id attribute of <g>s
     """
+    assert(isinstance(path, str)), path
+    assert(path.endswith('.svg')), path
+
     doc = parse(path)
     svg_list = doc.getElementsByTagName('svg')
     assert(len(svg_list) == 1)
