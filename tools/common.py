@@ -3,6 +3,7 @@ from scipy import sparse
 import glob
 import re
 import random
+import pickle
 
 ### Nested list
 def flattenNested(nested):
@@ -349,6 +350,16 @@ def nestedDict2NestedList(obj):
 
 # file IO
 
+def getBase(path):
+    """
+    get the URI of a material
+        E.g. images/play_day.svg -> play_day
+    """
+    assert(path.endswith('.txt') or path.endswith('.svg'))
+    name = re.findall(r'.*/(\w+).\w+$', path)
+    assert(len(name) == 1)
+    return name[0]
+
 def getFiles(path, ext, index=None):
     assert(ext.startswith('.')), 'extension must start with .!'
 
@@ -369,6 +380,7 @@ def getMaterial(layer):
     l = glob.glob('material/%s*.png' % layer)
     return random.choice(l)
 
+# decorators
 def static_vars(**kwargs):
     """
     Decoator to help function define static variables
@@ -379,3 +391,96 @@ def static_vars(**kwargs):
             setattr(func, k, kwargs[k])
         return func
     return decorate
+
+import time
+def wait(secs=10):
+    for i in range(secs):
+        print('- %i' % (i+1), end='\r')
+        time.sleep(1)
+
+from json.decoder import JSONDecodeError
+import requests
+import atexit
+from threading import Event
+import sys
+def enableQuery(cls):
+    """
+    decorator to add a similarty query function to the class
+    """
+    orig_init = cls.__init__
+
+    def __init__(self, *args, **kws):
+        """
+        Caveats! Create two instances will cause two dicts opened!
+            This is not a big problem.
+        """
+        orig_init(self, *args, **kws)
+        self.exit = False # Event()
+        self.exited = True
+        self.dict_path = '%s/relateDict.pkl' % self.dict_dir
+        with open(self.dict_path, 'rb') as f:
+            relateDict = pickle.load(f)
+        self.relateDict = relateDict
+        """
+        Caveats! only the first instance opened the dict can save the result at last.
+            -> atexit registed functions are stacked.
+            Because the each instance modifies the dict separately
+                There's no way they can inform each other
+        """
+        atexit.register(self.save_dict)
+
+    @static_vars(count_query=0)
+    def query_simi(self, token, keyword):
+        assert(isinstance(token, str)), token
+        assert(isinstance(keyword, str)), (type(keyword), keyword)
+
+        if token in self.relateDict and keyword in self.relateDict[token]:
+            return self.relateDict[token][keyword]
+
+        # if self.exit.is_set():
+        if self.exit:
+            print('>>>>>>>>>>> exit!')
+            self.exited = True
+            # raise RuntimeError('exit!')
+            sys.exit(1)
+
+        # recur query
+        while True:
+            try:
+                query_simi.count_query += 1
+                print('Query Request (%s): %i %s - %s' % (type(self).__name__, query_simi.count_query, keyword, token))
+                s = requests.get('http://api.conceptnet.io/relatedness?node1=/c/en/%s&node2=/c/en/%s' % (keyword, token)).json()['value']
+            except JSONDecodeError:
+                print('Buffered! Wait for 10 secs')
+                wait(10)
+                print('- try now')
+                continue
+            break
+
+        # save query results
+        if keyword not in self.relateDict:
+            self.relateDict[keyword] = {}
+        if token not in self.relateDict:
+            self.relateDict[token] = {}
+        self.relateDict[keyword][token] = s
+        self.relateDict[token][keyword] = s
+        # if query_simi.count_query > 30:
+        #     print(' saving dict...')
+        #     with open(self.dict_path, 'wb') as f:
+        #         pickle.dump(self.relateDict, f)
+        #
+        # if queried, save anyway
+        with open(self.dict_path, 'wb') as f:
+            pickle.dump(self.relateDict, f)
+        return s
+
+    def save_dict(self):
+        print(' saving dict.. %s' % type(self).__name__)
+        with open(self.dict_path, 'wb') as f:
+            pickle.dump(self.relateDict, f)
+
+    cls.__init__ = __init__
+    cls.query_simi = query_simi
+    cls.save_dict = save_dict
+
+    return cls

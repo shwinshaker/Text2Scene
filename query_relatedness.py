@@ -7,6 +7,7 @@ import pickle
 from json.decoder import JSONDecodeError
 from tools.common import ravel, static_vars
 from tools.knowledge import LayerBase, TextBase
+from tools.instance import Node
 
 def mirror():
     """
@@ -38,8 +39,8 @@ def query_simi(token, keyword):
     """
     Caveats: conceptNet doesn't differ pos in relatedness
     """
-    assert(isinstance(token, str))
-    assert(isinstance(keyword, str))
+    assert(isinstance(token, str)), token
+    assert(isinstance(keyword, str)), (type(keyword), keyword)
 
     with open('relateDict.pkl', 'rb') as f:
         # relateDict = dill.load(f)
@@ -89,6 +90,7 @@ def loop_query(textbase, layerbase):
                 continue
 
             # unseen
+            assert(isinstance(keyword.t, str)), (type(keyword), keyword)
             query_simi(token.t, keyword.t)
             # with open('relateDict.pkl', 'wb') as f:
             #     dill.dump(relateDict, f)

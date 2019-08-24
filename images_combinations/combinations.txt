@@ -1,0 +1,19 @@
+2019_sit: This is a poster about 2019. There are three girls eating pizza.
+Electronic_message: A girl slides a message bar next to the phone.
+Electronics: A group of people are attending an electronic goods exhibition.
+Gathering: Six people attend the party at tea time.
+Hamburger: A man and a woman communicate in front of a giant hamburger.
+happy_party: A group of people are having a party in the living room..
+Kongmin_lantern: A man put lanterns at night.
+Lover: A couple fell in love on the sofa.
+mom_and_her_girl: A woman was sitting on a couch using a computer, her daughter playing with a teddy bear.
+play_computer：A man is sitting on the beach with a computer.
+play_phone: A girl receives love messages on her cell phone.
+Playday: Two big boys sit on gamepads celebrating.
+Running: A boy is running in the field, A girl sat on a stone and looked at him.
+street_phone: A girl takes a selfie in front of a dress window.
+Thinking: A man thinks in front of a chart.
+use_computer: A girl is using a computer with headphones on.
+Women: Four women were celebrating their holiday in front of the window. Outside the window is a beautiful starry sky.
+work_with_computer: A woman is using three computers to organize forms.
+Working: A woman at her desk kept calling about work.

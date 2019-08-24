@@ -11,8 +11,7 @@ if [ -z "$1" ];then
     exit 1
 fi
 
-pattern='^A' # identification number of a valid layer
-# pattern='^#' # identification number of a valid layer
+pattern='^_x23_' # identification number of a valid layer
 fileName=$1
 imageDir=$2 #"images"
 baseName=${fileName%.*}

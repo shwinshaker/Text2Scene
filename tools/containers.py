@@ -1,17 +1,29 @@
 #!./env python
 
-from tools.image_process import getLayerNames
-from tools.text_process import SpacyLemmaTokenizer
-from tools.common import ravel
+from .image_process import getLayerNames, checkLayerName
+from .text_process import SpacyLemmaTokenizer, SimpleLemmaTokenizer
+# from .common import ravel
 import copy
+import warnings
 
 class Picture:
+
+    @staticmethod
+    def from_layers(layers):
+        assert(isinstance(layers[0], LayerName))
+        picture = Picture()
+        picture.layers_ = layers
+        picture.layernames_ = [l.s for l in layers]
+        picture.triple_set_ = set([layer.triples_ for layer in layers])
+        return picture
+
     """
     possible usage:
         picture = Picture('images/Firmware.svg')
         [n.t for n in picture.ravel_]
         picture.plot()
     """
+
     def __init__(self, img_name=None, layernames=None):
         """
         either built from file, or from self-punched layer names
@@ -21,23 +33,23 @@ class Picture:
             self.layernames_ = getLayerNames(img_name)
         else:
             warnings.warn('Caveats! img name bypassed!')
-            assert(layernames)
             self.layernames_ = layernames
 
-        self.layer_merge_ = LayerName()
-        self.layers_ = []
-        for layername in self.layernames_:
-            layer = LayerName(layername)
-            self.layers_.append(layer)
-            self.layer_merge_.absorb(layer)
-        # make the layers immutable
-        self.layers_ = tuple(self.layers_)
-        self.plot = self.layer_merge_.plot
+        if self.layernames_:
+            self.layer_merge_ = LayerName(src=self.img_name)
+            self.layers_ = []
+            for layername in self.layernames_:
+                layer = LayerName(layername, src=self.img_name)
+                self.layers_.append(layer)
+                self.layer_merge_.absorb(layer)
+            # make the layers immutable
+            self.layers_ = tuple(self.layers_)
+            self.plot = self.layer_merge_.plot
 
-        # vocab is a set, no duplicates
-        self.vocab_ = ravel(self.layer_merge_.entities_)
+            # vocab is a set, no duplicates
+            self.vocab_ = self.layer_merge_._ravel(self.layer_merge_.nested_entities_)
 
-        self.triple_set_ = set([layer.triples_ for layer in self.layers_])
+            self.triple_set_ = set([layer.triples_ for layer in self.layers_])
 
     def __repr__(self):
         """
@@ -59,6 +71,12 @@ class Picture:
     def __hash__(self):
         return hash(tuple(self.triple_set_))
 
+    def __len__(self):
+        return len(self.layers_)
+
+    def __iter__(self):
+        return iter(self.layers_)
+
 
 class Description:
     """
@@ -74,7 +92,8 @@ class Description:
             assert(text)
             self.text_ = text
 
-        tokenizer = SpacyLemmaTokenizer()
+        # tokenizer = SpacyLemmaTokenizer()
+        tokenizer = SimpleLemmaTokenizer()
         self.tokens_ = tokenizer(self.text_)
 
         # vocab is a set, no duplicates
@@ -97,6 +116,15 @@ import re
 from collections import defaultdict
 
 class LayerName:
+    @staticmethod
+    def from_nested_entities(nested_entities):
+        assert(isinstance(nested_entities_, dict))
+        layer = LayerName()
+        layer.nested_entities_ = nested_entities
+        layer.entities_ = layer._get_entities()
+        layer.triples_ = layer._get_triples()
+        return layer
+
     """
     given layer Name, return nested entities list
     E.g. subj(act[obj]) -> {'subj': {'act': ['obj']}}
@@ -105,47 +133,22 @@ class LayerName:
             -- should include count information in nested_entities_
 
     """
-    def __init__(self, s=''):
-        assert(isinstance(s, str))
-        # if s: checkLayerName(s)
-        if s: self._check_name(s)
+    def __init__(self, s='', src=None):
+        assert(isinstance(s, str)), s
+        if s: checkLayerName(s)
 
         self.s = s
+        self.src = src # source picture
 #         self.obj_ptn = '\[\w+(?=,\w+)*\]'
 #         self.act_obj_ptn = '\w+(?=%s)?' % self.obj_ptn
 
         if not self.s:
             self.nested_entities_ = {}
-        else:
-            self.nested_entities_ = self._get_nested_entities()
-        if not self.s:
             self.entities_= {'subj': {}, 'act': {}, 'obj': {}}
         else:
+            self.nested_entities_ = self._get_nested_entities()
             self.entities_ = self._get_entities()
         self.triples_ = self._get_triples()
-
-    def _check_name(self, name):
-        obj = '\[\w+(,\w+)*\]'
-        act_obj = '\w+(%s)*' % obj
-        reg_single = '\w+(\(%s(,%s)*\))+' % (act_obj, act_obj)
-        reg_multi = 'group\(have\[%s(,%s)*\]\)' % (reg_single,
-                                                   reg_single)
-        from rules.labels import subjects
-
-        if name.startswith('#background'):
-            if not name == '#background':
-                raise KeyError(name)
-        elif name.startswith('#group'):
-            if not re.match(r'^#%s$' % reg_multi, name):
-                raise KeyError(name)
-        elif name.startswith('#accessory'):
-            if not re.match(r'#accessory(\(%s(,%s)*\))*' % (act_obj, act_obj), name):
-                raise KeyError(name)
-        elif any([name.startswith('#%s' % key) for categ in subjects for key in subjects[categ]]):
-            if not re.match(r'^#%s$' % reg_single, name):
-                raise KeyError(name)
-        else:
-            raise KeyError(name)
 
     def __eq__(self, other):
         """
@@ -162,43 +165,51 @@ class LayerName:
     def __repr__(self):
         return self.s
 
-    def __individualize_subjs(self):
+    def _ravel(self, nested_entities_):
+        ravel_ = set()
+        for subj in nested_entities_:
+            ravel_.add(subj)
+            for act in nested_entities_[subj]:
+                ravel_.add(act)
+                for obj in nested_entities_[subj][act]:
+                    ravel_.add(obj)
+        return ravel_
+
+    def __individualize_subjs(self, s):
         """
         if there are mutiple same subjects in a layer, name them sequencially
             E.g. man(),man() -> man1(),man2()
         """
-        subjs = re.findall('[\[|,](\w+)\(', self.s)
+        subjs = re.findall('[\[|,](\w+)\(', s)
         if len(subjs) != len(set(subjs)):
             duplicates = list(set([subj for subj in subjs if subjs.count(subj)>1]))
             for subj in duplicates:
                 for i in range(subjs.count(subj)):
                     ## substitute orignial name
-                    self.s = re.sub('(?<=[\[,])%s(?=\()' % subj,
-                                    '%s%i' % (subj, i+1),
-                                    # '%s%i' % (subj, i),
-                                    self.s, count=1)
-            ## find the subjects again
-            # subjs = re.findall('[\[|,](\w+)\(', self.s)
+                    s = re.sub('(?<=[\[,])%s(?=\()' % subj,
+                               '%s%i' % (subj, i+1), s, count=1)
+        return s
 
     def _get_subjs(self):
         """
         define a exclusion variable to determine if resolve conflict
             same variable used by get_nested_subjs
         """
-        if self.s.startswith('#background'):
+        # serialize name for later associated action detection
+        self.__s = self.__individualize_subjs(self.s)
+
+        if self.__s.startswith('#background'):
             # return ['background']
             return [Node('background', attr='subj')]
-        if self.s.startswith('#accessory'):
+        if self.__s.startswith('#accessory'):
             # return ['accessory']
             return [Node('accessory', attr='subj')]
-        if self.s.startswith('#group'):
+        if self.__s.startswith('#group'):
             # action can not be neglected, thus here we can append \(
             # but if actions can be neglected, need to modify here
 
-            # serialize name for later associated action detection
-            self.__individualize_subjs()
 
-            subjs = re.findall('[\[|,](\w+)\(', self.s)
+            subjs = re.findall('[\[|,](\w+)\(', self.__s)
             # subjs_ = [] # temp list for count
             nodes = []
             for subj in subjs:
@@ -215,8 +226,8 @@ class LayerName:
             assert(len(nodes) == len(set(nodes)))
             return nodes
         else:
-            subjs = re.findall('^#(\w+)\(', self.s)
-            assert len(subjs) == 1, (self.s, subjs)
+            subjs = re.findall('^#(\w+)\(', self.__s)
+            assert len(subjs) == 1, (self.__s, subjs)
             return [Node(subjs[0], attr='subj')]
         # # make sure there are no duplicated subjects
         # assert(len(subjs) == len(set(subjs)))
@@ -229,12 +240,12 @@ class LayerName:
         """
         subjs = self._get_subjs()
         # if group, remove group mark
-        if self.s.startswith('#group'):
-            s = re.sub('#group\(have', '', self.s)
+        if self.__s.startswith('#group'):
+            s = re.sub('#group\(have', '', self.__s)
             s = s.rstrip(')')
         else:
             # make the form consistent
-            s = '[%s]' % self.s.lstrip('#')
+            s = '[%s]' % self.__s.lstrip('#')
 
         # temporarily remove all objects
         obj = '\[\w+(,\w+)*\]'
@@ -269,11 +280,11 @@ class LayerName:
         acts = self._get_acts()
 
         # if group, remove group mark
-        if self.s.startswith('#group'):
-            s = re.sub('#group\(have', '', self.s)
+        if self.__s.startswith('#group'):
+            s = re.sub('#group\(have', '', self.__s)
             s = s.rstrip(')')
         else:
-            s = '[%s]' % self.s.lstrip('#')
+            s = '[%s]' % self.__s.lstrip('#')
 
         # extend or append
         objs = defaultdict(lambda: defaultdict(set))

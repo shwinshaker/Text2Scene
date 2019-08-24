@@ -16,6 +16,23 @@ import warnings
 
 from tools.instance import Node
 
+class SimpleLemmaTokenizer:
+    def __init__(self):
+        self.nlp = spacy.load("en_core_web_sm")
+        self.nlp.add_pipe(self.__filter, last=True)
+        self.nlp.add_pipe(self.__to_node, last=True)
+
+    def __filter(self, doc):
+        return [t for t in doc if not t.is_stop and not t.is_punct]
+        # return [t for t in doc if not t.is_stop]
+
+    def __to_node(self, doc):
+        return [Node(t.lemma_, t.pos_) for t in doc]
+
+    def __call__(self, sentence):
+        return self.nlp(sentence.strip('\n'))
+
+
 class SpacyLemmaTokenizer:
 
     """

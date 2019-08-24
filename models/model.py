@@ -104,7 +104,7 @@ def categPrecision(discriminator, layers, sentence, lamb=0.5, verbose=False):
     return acc, F1
 
 
-def categMetric(discriminator, index=None, test_num=5, lamb=1.0, verbose=True):
+def categMetric(discriminator, index=None, test_num=5, lamb=1.0, verbose=True, img_dir='images', txt_dir='text'):
     if index is None:
         # import random
         # index = list(range(len(discriminator.dataset)))
@@ -116,8 +116,8 @@ def categMetric(discriminator, index=None, test_num=5, lamb=1.0, verbose=True):
 
     F1s = []
     for c, i in enumerate(index):
-        img = 'images/%i.svg' % i
-        txt = 'text/%i.txt' % i
+        img = '%s/%i.svg' % (img_dir, i)
+        txt = '%s/%i.txt' % (txt_dir, i)
         print(' [%i] ------ %i -----' % (c, i), end='\n\n')
         acc, F1 = categPrecision(discriminator,
                                  *discriminator.dataset.getOneLayerSent(txt, img),

@@ -63,3 +63,29 @@ class Node:
         """
         return Node(self.t, attr=self.attr)
 
+
+from spacy.tokens.token import Token
+class CombToken:
+    def __init__(self, token, keyword):
+        if token:
+            assert(isinstance(token, Token))
+        if keyword:
+            assert(isinstance(keyword, Node))
+        self.token = token
+        self.keyword = keyword
+
+        self.tup = (self.token, self.keyword)
+
+    def __repr__(self):
+        if self.token is None:
+            return '->%s' % (self.keyword.t)
+        if self.keyword is None:
+            return '%s->' % (self.token.lemma_)
+        return '%s->%s' % (self.token.lemma_, self.keyword.t)
+
+    def __eq__(self, other):
+        return self.tup == other.tup
+
+    def __hash__(self):
+        return hash(self.tup)
+

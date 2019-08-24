@@ -1,6 +1,6 @@
 #!./env python
 
-from tools.common import ravel
+# from tools.common import ravel
 from tools.instance import Node
 from tools.containers import Picture, Description, LayerName
 from tools.common import ddict2dict
@@ -11,9 +11,7 @@ class LayerBase():
     """
     layer Base knowledge, show only built on train set!
     """
-    def __init__(self, filenames=[],
-                 img_dir='images',
-                 ext='.svg'):
+    def __init__(self, filenames=[], img_dir='images', ext='.svg'):
 
         """
         need other dictionary to save the layer frequency
@@ -26,14 +24,16 @@ class LayerBase():
         # self.layer_merge_ = LayerName()
         layer_merge_ = LayerName()
         self.pictures_ = []
+        len_out = 10
         for svg in filenames:
+            std_out = ' - [%s]' % svg
+            print(' '*len_out, end='\r')
+            print(std_out, end='\r')
             picture = Picture(svg)
-            # for layer in getLayerNames(svg):
-            #     layername = LayerName(layer)
-            #     self.layers_.append(layername)
-            # self.layer_merge_.absorb(picture.layer_merge_)
             layer_merge_.absorb(picture.layer_merge_)
             self.pictures_.append(picture)
+            len_out = len(std_out)
+        print('done')
         # self.entities_ = self.layer_merge_.entities_
         # prevent empty query change the key
         self.entities_ = layer_merge_.entities_
@@ -48,7 +48,10 @@ class LayerBase():
         # keyword vocab contains no dupicates
         # here we explicitly need the order the make sure results reproducable
         ## such as index and line up features
-        self.vocab_ = sorted(ravel(self.entities_))
+        """
+        to-do: put ravel in a better place
+        """
+        self.vocab_ = sorted(layer_merge_._ravel(layer_merge_.nested_entities_)) # borrow the ravel function
 
         self.plot = layer_merge_.plot
 
@@ -61,9 +64,7 @@ class LayerBase():
 
 
 class TextBase():
-    def __init__(self, filenames=[],
-                 txt_dir='text',
-                 ext='.txt'):
+    def __init__(self, filenames=[], txt_dir='text', ext='.txt'):
 
         if not filenames:
             filenames = glob.glob('%s/*%s' % (txt_dir, ext))
@@ -73,9 +74,11 @@ class TextBase():
         self.vocab_ = set()
         self.doc_vocab_ = set()
         for txt in filenames:
+            print(' - [%s]' % txt, end='\r', flush=True)
             doc = Description(txt)
             self.vocab_ |= doc.vocab_
             self.doc_vocab_.add(doc)
+        print('done')
         self.vocab_ = sorted(self.vocab_)
 
     def index(self, token):
