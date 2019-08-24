@@ -1,6 +1,6 @@
 road_sign: A man is standing in front of trees and signs.
 timeline: A man is walking with some paper in his hand.
-to_do_list: A woman is writing paper with a pen.
+to_do_list: A woman is writing on a piece of paper with a pen.
 track_and_field: A woman is running over hurdles.
 transfer_money: A man is standing and a woman is sitting with a computer to transfer money.
 videographer: A man is standing against the camera.
@@ -36,5 +36,55 @@ Freelancer: A woman sit in the room and uses her computer.
 Friendship: A man talks with his friend under the tree.
 Frozen: There is a snowman.
 Game_day: Two man sat on the sofa celebrating a game.
-Gaming: A man touches a gamepad.
+Gaming: A man touches a game controllers.
 Gardening: A woman touches the sunflowers.
+pizza_sharing: Three women are sitting on the sofa eating pizza.
+play_time: A man is holding a woman.
+podcast_audience:A woman is standing in front of her pad, while a man is looking at his mobile phone in his wheelchair.
+podcast: A woman is sitting at a table listening to music.
+popular: A woman is standing in a text message.
+portfolio_update: A woman is standing in front of the web page.
+post_online: A man is standing in front of a mobile phone.
+posting_photo: A woman is standing in front of a computer pad mobile phone.
+powerful: A woman is sitting on a chair.
+press_play: A woman is sitting on a chair in the office, pointing at the pad.
+printing_invoices: A man is sitting on a printer looking at his phone. A man and a woman are bending over to file.
+problem_solving: A man is walking and looking at his phone.
+process: A woman is standing in front of three documents.
+product_hunt: A woman is standing next to the trophy and a cat.
+product_teardown: A man is standing up doing a puzzle.
+product_tour: A man and two women are standing looking at the display board.
+professor: A man is standing in front of the blackboard.
+profile: A man is walking beside the web page.
+programmer: A woman is sitting in front of a computer.
+programming: A man is sitting in front of a computer.
+projections: A man is standing in front of the pad.
+prototyping_process: A woman is standing in front of the drawing board with a pen.
+pure_love: A man was sitting on a bench holding a woman with three balloons.
+questions: A woman is standing holding the sign.
+queue: Three women and a man lined up at the fence.
+travel_booking: A woman sits in front of a web page.
+true_friends: A man and a woman are standing facing each other with bags on their backs.
+taking_selfie: A woman is taking a selfie.
+team_work: A man is sitting in front of the leaves, and a woman is standing.
+teddy_bear: A woman is sitting holding a bear.
+texting: A woman is standing by a tree with a mobile phone.
+throw_down: A woman is sitting on the board with a ball.
+together: A man and a woman are standing hand in hand in the park.
+toy_car: A man is squatting down playing with a car.
+usability_testing: Two men are standing in front of the web page.
+user_flow: A woman is standing and writing.
+wedding: A man and a woman are standing hugging at the wedding.
+window_shopping: A woman was looking at clothes in front of a glass case.
+winners: A man and a woman are jumping in front of the cup.
+winter_designer: A woman is sitting on a chair in the office.
+wireframing: A woman is standing in front of the computer.
+wishes: A woman is standing with a lantern.
+women_day: Four women are standing with the board.
+word_of_mouth: A man and a woman were whispering.
+wordpress: A woman is walking beside the web page, looking down at her phone.
+work_chat: Two men and a woman are standing by the message.
+working_late: A woman is sitting by the window playing computer.
+working_out: A woman is standing with dumbbells and a man is running.
+working_remotely: A woman is sitting at her desk, looking at her computer and making a phone call.
+young_and_happy: A man is standing clutching at a street lamp.

@@ -6,11 +6,13 @@
 
 #!/bin/bash
 
+count=0
 while read line
 do
     name=$(echo $line | awk -F ':' '{print$1}')
     if [ -e "$name.svg" ];then
-	echo $name
+	((count+=1))
+	echo $count $name
 	text=$(echo $line | awk -F ':' '{print$2}')
 	echo $text > "../text/$name.txt"
     else
