@@ -5,6 +5,9 @@ import os
 from tools.common import wait
 from tools.common import static_vars
 
+from tools.text_process import Spell
+spell = Spell(path='../google-10000-english-usa-no-swears.txt')
+
 from tools.image_process import stack_svgs
 from models.pipeline import Translate
 translate = Translate(img_dir='../images', dict_dir='..')
@@ -30,9 +33,10 @@ def clean_results(d='results'):
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    text = ''
     imgname = ''
     error = ''
+    text = ''
+    corrections = {} # []
     if request.method == "POST":
 
         """
@@ -68,8 +72,15 @@ def index():
         translate.ground.exit = False
         translate.metric.exit = False
 
-        text = request.form['url'].strip('\n')
+        text = request.form['url'].strip('\n').lower()
         print(text)
+        corrections = spell(text)
+        print(corrections)
+        if corrections:
+            return render_template('index.html', text=text,
+                                                 error=error,
+                                                 corrections=corrections)
+
         materials = ['../material/%s.png' % l.s for l in translate(text)]
         if not materials:
             imgname = 'results/error.gif'
@@ -81,7 +92,8 @@ def index():
             print('output to: %s' % opt_file)
             stack_svgs(materials, opt_file=opt_file)
             imgname = 'results/%s.svg' % URI
-    return render_template('index.html', text=text, imgname=imgname, error=error)
+    return render_template('index.html', text=text, imgname=imgname, error=error,
+                                         corrections=corrections)
 
 if __name__ == '__main__':
     app.run()

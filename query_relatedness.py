@@ -89,6 +89,7 @@ def loop_query(textbase, layerbase):
                 print(' stored [%i] ' % count_stored, end='\r')
                 continue
 
+            print(' stored [%i] ' % count_stored)
             # unseen
             assert(isinstance(keyword.t, str)), (type(keyword), keyword)
             query_simi(token.t, keyword.t)

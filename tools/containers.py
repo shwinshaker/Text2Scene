@@ -32,7 +32,7 @@ class Picture:
             self.img_name = img_name
             self.layernames_ = getLayerNames(img_name)
         else:
-            warnings.warn('Caveats! img name bypassed!')
+            warnings.warn('Caveats! Picture initialized from layers!')
             self.layernames_ = layernames
 
         if self.layernames_:
