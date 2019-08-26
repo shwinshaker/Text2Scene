@@ -41,18 +41,23 @@
 					{% endif %}
 				{% endfor %}
 			{% endif %}
-			<br>
-			{% for error in errors %}
-			<h4>{{ error }}</h4>
+			{% for errorname in errors %}
+				{% if errorname == 'non-ascii' %}
+					{% for error in errors[errorname] %}
+						<p>Non-ascii token <span style="font-weight: bold;">{{error}}</span> detected! Please hit in reasonable English.</p>
+					{% endfor %}
+				{% elif errorname == 'not-found' %}
+					{% if errors[errorname] %}
+						<p>Material not found..</p>
+					{% endif %}
+				{% else %}
+					<p>{{ errorname }}</p>
+				{% endif %}
 			{% endfor %}
 		</div>
 		<div class="col-sm-5 col-sm-offset-1">
 			{% if imgname %}
-			{% if error %}
-			<h3>{{ error }}</h3>
-			{% else %}
 			<h1>Image</h1>
-			{% endif %}
 			<div id="results">
 			<img src="{{ url_for('static', filename=imgname) }}" style="max-width: 300px; max-height: 400px">
 			<!-- <img src="{{ imgname }}"> -->

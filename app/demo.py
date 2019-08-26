@@ -5,7 +5,8 @@ import os
 from tools.common import wait
 from tools.common import static_vars
 
-from tools.text_process import Spell
+from tools.text_process import Spell, Check
+asciiCheck = Check()
 spell = Spell(path='../google-10000-english-usa-no-swears.txt')
 
 from tools.image_process import stack_svgs
@@ -34,7 +35,8 @@ def clean_results(d='results'):
 @app.route('/', methods=['GET', 'POST'])
 def index():
     imgname = ''
-    error = ''
+    errors = {'non-ascii': [],
+              'not-found': False}
     text = ''
     corrections = {} # []
     if request.method == "POST":
@@ -72,19 +74,25 @@ def index():
         translate.ground.exit = False
         translate.metric.exit = False
 
-        text = request.form['url'].strip('\n').lower()
+        text = request.form['url']
+        errors['non-ascii'] = asciiCheck(text)
+        if errors['non-ascii']:
+            return render_template('index.html', text=text,
+                                                 errors=errors)
+        text = text.strip('\n').lower()
         print(text)
         corrections = spell(text)
         print(corrections)
         if corrections:
             return render_template('index.html', text=text,
-                                                 error=error,
+                                                 errors=errors,
                                                  corrections=corrections)
 
         materials = ['../material/%s.png' % l.s for l in translate(text)]
         if not materials:
             imgname = 'results/error.gif'
-            error='Material not found..'
+            # error='Material not found..'
+            errors['not-found'] = True
         else:
             # unique name to prevent loading from cache
             URI = '%.7f' % time.time()
@@ -92,7 +100,7 @@ def index():
             print('output to: %s' % opt_file)
             stack_svgs(materials, opt_file=opt_file)
             imgname = 'results/%s.svg' % URI
-    return render_template('index.html', text=text, imgname=imgname, error=error,
+    return render_template('index.html', text=text, imgname=imgname, errors=errors,
                                          corrections=corrections)
 
 if __name__ == '__main__':
