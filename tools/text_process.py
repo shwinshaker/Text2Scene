@@ -16,7 +16,51 @@ import warnings
 
 from tools.instance import Node
 
-from spacy_hunspell import spaCyHunSpell
+import os
+from spacy.tokens import Doc, Span, Token
+from hunspell import HunSpell
+
+DEFAULT_DICTIONARY_PATHS = {
+    'mac': '/Users/dongjustin/Library/Spelling/en_US',
+    'linux': '/usr/share/hunspell',
+}
+
+class spaCyHunSpell(object):
+
+    name = 'hunspell'
+
+    def __init__(self, nlp, path):
+        """
+        why would we needs nlp?
+        """
+        if path in DEFAULT_DICTIONARY_PATHS:
+            default_path = DEFAULT_DICTIONARY_PATHS[path]
+            dic_path, aff_path = (
+                os.path.join(default_path, 'en_US.dic'),
+                os.path.join(default_path, 'en_US.aff'),
+            )
+            print(dic_path, aff_path)
+        else:
+            assert len(path) == 2, 'Include two paths: dic_path and aff_path'
+            dic_path, aff_path = path
+
+        self.hobj = HunSpell(dic_path, aff_path)
+
+        Token.set_extension('hunspell_spell', default=None, force=True)
+        Token.set_extension('hunspell_suggest', getter=self.get_suggestion, force=True)
+
+    def __call__(self, doc):
+        for token in doc:
+            token._.hunspell_spell = self.hobj.spell(token.text)
+        return doc
+
+    def get_suggestion(self, token):
+        # TODO: include a lower option?
+        # TODO: include suggestion numbers?
+        # TODO: include stemmer?
+        return self.hobj.suggest(token.text)
+
+
 class Spell:
     def __init__(self, path='google-10000-english-usa-no-swears.txt'):
         with open(path, 'r') as f:
