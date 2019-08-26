@@ -21,7 +21,7 @@ from spacy.tokens import Doc, Span, Token
 from hunspell import HunSpell
 
 DEFAULT_DICTIONARY_PATHS = {
-    'mac': '/Users/dongjustin/Library/Spelling/en_US',
+    'darwin': '/Users/dongjustin/Library/Spelling/en_US',
     'linux': '/usr/share/hunspell',
 }
 
@@ -60,6 +60,18 @@ class spaCyHunSpell(object):
         # TODO: include stemmer?
         return self.hobj.suggest(token.text)
 
+class Check:
+    def __init__(self):
+        self.nlp = spacy.load("en_core_web_sm")
+
+    def __call__(self, sentence):
+        doc = self.nlp(sentence)
+        errors = [] #{'non-ascii': []}
+        for t in doc:
+            if not t.is_ascii:
+                # errors['non-ascii'].append(t)
+                errors.append(t)
+        return errors
 
 class Spell:
     def __init__(self, path='google-10000-english-usa-no-swears.txt'):
@@ -68,7 +80,9 @@ class Spell:
         self.freq_dict = dict([(w, i) for i, w in enumerate(word_freq)])
 
         self.nlp = spacy.load("en_core_web_md")
-        hunspell = spaCyHunSpell(self.nlp, 'mac')
+        from sys import platform
+        print('Running on %s' % platform)
+        hunspell = spaCyHunSpell(self.nlp, platform)
         self.nlp.add_pipe(hunspell)
 
     def __call__(self, sentence):
