@@ -63,6 +63,18 @@ class Node:
         """
         return Node(self.t, attr=self.attr)
 
+    def __bool__(self):
+        return bool(self.t)
+
+
+class VerbNode(Node):
+    """
+    inherited from node, allow intension
+    """
+    def __init__(self, intension=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.intension = intension
+
 
 from spacy.tokens.token import Token
 class CombToken:
@@ -91,4 +103,8 @@ class CombToken:
 
     def __hash__(self):
         return hash(self.tup)
+
+    def __bool__(self):
+        ## either one exists, combtoken exists
+        return bool(self.token) or bool(self.keyword)
 
