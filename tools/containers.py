@@ -1,8 +1,7 @@
 #!./env python
 
 from .image_process import getLayerNames, checkLayerName
-from .text_process import SpacyLemmaTokenizer, SimpleLemmaTokenizer
-# from .common import ravel
+from .text_process import SimpleLemmaTokenizer
 import copy
 import warnings
 
@@ -126,7 +125,6 @@ class Description:
             assert(text)
             self.text_ = text
 
-        # tokenizer = SpacyLemmaTokenizer()
         tokenizer = SimpleLemmaTokenizer()
         self.tokens_ = tokenizer(self.text_)
 
@@ -352,13 +350,16 @@ class LayerName:
 
         entities = defaultdict(lambda: defaultdict(int))
         for subj in self.nested_entities_:
-            assert(subj not in entities['subj']), subj
-            entities['subj'][subj] += subj.count #.add(subj)
+            if subj:
+                assert(subj not in entities['subj']), subj
+                entities['subj'][subj] += subj.count #.add(subj)
             for act in self.nested_entities_[subj]:
-                # same actions in different subject will be counted separately
-                entities['act'][act] += act.count #.add(act)
+                if act:
+                    # same actions in different subject will be counted separately
+                    entities['act'][act] += act.count #.add(act)
                 for obj in self.nested_entities_[subj][act]:
-                    entities['obj'][obj] += obj.count #.add(obj)
+                    if obj:
+                        entities['obj'][obj] += obj.count #.add(obj)
         return ddict2dict(entities)
 
     def _get_triples(self):
