@@ -66,6 +66,9 @@ class Node:
 
 from spacy.tokens.token import Token
 class CombToken:
+    """
+    instance that binds spacy token and keyword node
+    """
     def __init__(self, token, keyword):
         if token:
             assert(isinstance(token, Token))

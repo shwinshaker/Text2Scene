@@ -4,7 +4,7 @@
 import spacy
 nlp = spacy.load("en_core_web_sm")
 from collections import defaultdict
-from tools.common import ddict2dict, enableQuery
+from tools.common import ddict2dict, enableQuery, enableQuery_, getElementFromSet
 from tools.instance import Node, CombToken
 from tools.knowledge import LayerBase
 from tools.containers import Picture, LayerName
@@ -12,16 +12,10 @@ from query_relatedness import query_simi
 from .metric import WeightedMeanIOU
 import warnings
 
-def get_element_from_set(set_, e_):
-    assert(isinstance(set_, dict) or isinstance(set_, set))
-    for e in set_:
-        if e == e_:
-            return e
-
-@enableQuery
+@enableQuery_
 class Ground:
-    def __init__(self, img_dir='images', dict_dir='.'):
-        self.dict_dir = dict_dir
+    def __init__(self, img_dir='images'):
+        # self.dict_dir = dict_dir
         self.layerbase = LayerBase(img_dir=img_dir)
         self.collocations_ = self.layerbase.collocations_
         self.entities_ = self.layerbase.entities_
@@ -146,9 +140,9 @@ class Ground:
 
             if most_simi_:
                 if fix_have:
-                    sort_f = lambda x: (x[-1], get_element_from_set(self.collocations_[x[0]][self.have], x[1]).count)
+                    sort_f = lambda x: (x[-1], getElementFromSet(self.collocations_[x[0]][self.have], x[1]).count)
                 else:
-                    sort_f = lambda x: (x[-1], get_element_from_set(self.collocations_[x[0]][x[1]], x[2]).count)
+                    sort_f = lambda x: (x[-1], getElementFromSet(self.collocations_[x[0]][x[1]], x[2]).count)
                 return sorted(most_simi_, key=sort_f)[-1]
 
         elif attr == 'act':
@@ -162,7 +156,7 @@ class Ground:
                 if tup:
                     most_simi_.append((subj,) + tup)
             if most_simi_:
-                sort_f = lambda x: (x[-1], get_element_from_set(self.collocations_[x[0]], x[1]).count)
+                sort_f = lambda x: (x[-1], getElementFromSet(self.collocations_[x[0]], x[1]).count)
                 return sorted(most_simi_, key=sort_f)[-1]
         else:
             raise KeyError
@@ -367,9 +361,16 @@ class Translate:
 
     def __init__(self, img_dir='images', dict_dir='.'):
         self.ground = Ground(img_dir=img_dir, dict_dir=dict_dir)
+        # self.ground = Ground(img_dir=img_dir)
         # self.layerbase = LayerBase()
+        # self.metric = WeightedMeanIOU(dict_dir=dict_dir)
         self.metric = WeightedMeanIOU(dict_dir=dict_dir)
-        self.simi = self.metric.layer_simi
+
+        # wrap function
+        def __simi(*args, **kwargs):
+            s = self.metric.layer_simi(*args, **kwargs)
+            return s['overall']
+        self.simi = __simi
 
     def __call__(self, text=None, path=None, verbose=True):
         if text is None:

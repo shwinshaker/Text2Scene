@@ -12,6 +12,8 @@ from tools.joint_process import wrapRelaxedSimi, sentSimi
 from tools.math import Normalizer
 from sklearn.preprocessing import MinMaxScaler
 
+import warnings
+
 class BinaryCategEncoder():
     """
     A simple category encoder used for evaluation
@@ -537,13 +539,15 @@ class SimiEncoder():
 # 2.0
 from scipy import sparse
 import numpy as np
-import dill
+import pickle
 from sklearn.preprocessing import MinMaxScaler
 from tools.knowledge import LayerBase, TextBase
 from tools.containers import Description, Picture
+from tools.common import enableQuery, enableQuery_
 
 # temporarily set to 0
-class TextPictureRavelEncoder():
+@enableQuery_
+class TextPictureRavelHistSimiEncoder:
     """
     IDF?
         E.g. man and woman are everywhere
@@ -554,21 +558,22 @@ class TextPictureRavelEncoder():
         self.length = length
 
         print(' - Initiate layer base..')
-        # self.layerbase = LayerBase(names)
-        ## layerbase can utilize the entire dataset
-        self.layerbase = LayerBase()
+        ## layerbase can utilize the entire dataset, why is that?
+        # self.layerbase = LayerBase()
+        self.layerbase = LayerBase(names)
         print(' - Initiate text base..')
         self.textbase = TextBase(names)
 
         assert(length < len(self.textbase)), 'feature length should be smaller than the textbase length %i' % len(self.textbase)
 
-        print(' - Load relatedness dict..')
-        with open('relateDict.pkl', 'rb') as f:
-            self.relateDict = dill.load(f)
+        # print(' - Load relatedness dict..')
+        # with open('relateDict.pkl', 'rb') as f:
+        #     self.relateDict = pickle.load(f)
 
         print(' - Initiate scaler..')
         self.scaler = MinMaxScaler()
-        self.scaler.fit(np.array([self.relateDict[k.t][t.t] for k in self.layerbase.vocab_ for t in self.textbase.vocab_]).reshape(-1,1))
+        # self.scaler.fit(np.array([self.relateDict[k.t][t.t] for k in self.layerbase.vocab_ for t in self.textbase.vocab_]).reshape(-1,1))
+        self.scaler.fit(np.array([self.query_simi(k.t, t.t) for k in self.layerbase.vocab_ for t in self.textbase.vocab_]).reshape(-1,1))
 
         # bins = np.linspace(0, 1, num+1)
         # extra bin to make the right one open to filter zeros
@@ -594,11 +599,15 @@ class TextPictureRavelEncoder():
                 warnings.warn('Unseen word encountered! %s(%s)' % (token.t, token.attr))
                 continue
             for keyword in pic.vocab_:
-                assert(self.relateDict[keyword.t][token.t] <= 1.0),\
-                      (keyword.t, token.t)
+                if keyword not in self.layerbase:
+                    warnings.warn('Unseen keyword encountered! %s(%s)' % (keyword.t, keyword.attr))
+                    continue
+                # assert(self.relateDict[keyword.t][token.t] <= 1.0),\
+                #      (keyword.t, token.t)
                 tuples.append((self.layerbase.index(keyword),
                                self.textbase.index(token),
-                               self.relateDict[keyword.t][token.t]))
+                               # self.relateDict[keyword.t][token.t]))
+                               self.query_simi(keyword.t, token.t)))
         if not tuples:
             warnings.warn('No word in \"%s\" are seen. Returned zero matrix.' % doc.text_.strip('\n'))
             return np.zeros((len(self.layerbase), self.length)).ravel()

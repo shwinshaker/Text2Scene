@@ -1,9 +1,9 @@
 #!./env python
 
 # from tools.common import ravel
-from tools.instance import Node
-from tools.containers import Picture, Description, LayerName
-from tools.common import ddict2dict
+from .instance import Node
+from .containers import Picture, Description, LayerName
+from .common import ddict2dict
 
 import glob
 
@@ -24,7 +24,8 @@ class LayerBase():
         # self.layer_merge_ = LayerName()
         layer_merge_ = LayerName()
         self.pictures_ = []
-        len_out = 10
+        self.triples_ = []
+        len_out = 30
         for svg in filenames:
             std_out = ' - [%s]' % svg
             print(' '*len_out, end='\r')
@@ -32,8 +33,9 @@ class LayerBase():
             picture = Picture(svg)
             layer_merge_.absorb(picture.layer_merge_)
             self.pictures_.append(picture)
+            self.triples_.extend(picture.triples_)
             len_out = len(std_out)
-        print('done')
+        print('done', end='\n\n')
         # self.entities_ = self.layer_merge_.entities_
         # prevent empty query change the key
         self.entities_ = layer_merge_.entities_
@@ -62,6 +64,9 @@ class LayerBase():
     def __len__(self):
         return len(self.vocab_)
 
+    def __iter__(self):
+        return iter(self.vocab_)
+
 
 class TextBase():
     def __init__(self, filenames=[], txt_dir='text', ext='.txt'):
@@ -73,12 +78,16 @@ class TextBase():
 
         self.vocab_ = set()
         self.doc_vocab_ = set()
+        len_out = 30
         for txt in filenames:
-            print(' - [%s]' % txt, end='\r', flush=True)
+            std_out = ' - [%s]' % txt
+            print(' ' * len_out, end='\r')
+            print(std_out, end='\r')
+            # print(' - [%s]' % txt, end='\r', flush=True)
             doc = Description(txt)
             self.vocab_ |= doc.vocab_
             self.doc_vocab_.add(doc)
-        print('done')
+        print('done', end='\n\n')
         self.vocab_ = sorted(self.vocab_)
 
     def index(self, token):

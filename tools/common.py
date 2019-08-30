@@ -350,6 +350,12 @@ def nestedDict2NestedList(obj):
 
 # file IO
 
+def getElementFromSet(set_, e_):
+    assert(isinstance(set_, dict) or isinstance(set_, set))
+    for e in set_:
+        if e == e_:
+            return e
+
 def getBase(path):
     """
     get the URI of a material
@@ -398,26 +404,139 @@ def wait(secs=10):
         print('- %i' % (i+1), end='\r')
         time.sleep(1)
 
+import spacy
+import itertools
+class QuerySimi:
+    def __init__(self, dict_dir='.'):
+        print('Loading GloVe model.. ')
+        self.nlp = spacy.load("en_core_web_md")
+        print('Loaded.')
+
+        self.dict_path = '%s/relateDictGloVe.pkl' % dict_dir # self.dict_dir
+        print('Loading related dict..')
+        with open(self.dict_path, 'rb') as f:
+            relateDict = pickle.load(f)
+        self.relateDict = relateDict
+
+    def __call__(self, s1, s2):
+        assert(isinstance(s1, str))
+        assert(isinstance(s2, str))
+        if '_' in s1: s1 = s1.replace('_', ' ')
+        if '_' in s2: s2 = s2.replace('_', ' ')
+        for p in string.punctuation:
+            assert(p not in s1), s1
+        for p in string.punctuation:
+            assert(p not in s2), s2
+
+        # if seen, return directly
+        if s1 in self.relateDict and s2 in self.relateDict[s1]:
+            return self.relateDict[s1][s2]
+
+        # compute similarity
+        doc1, doc2 = self.nlp(s1), self.nlp(s2)
+        for t in doc1:
+            if not t.has_vector: print(t)
+        for t in doc2:
+            if not t.has_vector: print(t)
+        # assert(all([t.has_vector for t in doc1])), doc1
+        # assert(all([t.has_vector for t in doc2])), doc2
+        simi = max([t1.similarity(t2) for t1, t2 in itertools.product(doc1, doc2)])
+        if s1 not in self.relateDict:
+            self.relateDict[s1] = {}
+        if s2 not in self.relateDict:
+            self.relateDict[s2] = {}
+        self.relateDict[s1][s2] = simi
+        self.relateDict[s2][s1] = simi
+
+        return simi
+
+    def save_dict(self):
+        print(' saving dict.. %s' % type(self).__name__)
+        with open(self.dict_path, 'wb') as f:
+            pickle.dump(self.relateDict, f)
+
+import string
+import atexit
+def enableQuery(cls):
+    orig_init = cls.__init__
+
+    def __init__(self, dict_dir='.', *args, **kws):
+        print('Loading GloVe model.. (%s)' % type(self).__name__)
+        self.nlp = spacy.load("en_core_web_md")
+        print('Loaded.')
+
+        self.dict_path = '%s/relateDictGloVe.pkl' % dict_dir # self.dict_dir
+        print('Loading related dict..')
+        with open(self.dict_path, 'rb') as f:
+            relateDict = pickle.load(f)
+        self.relateDict = relateDict
+        atexit.register(self.save_dict)
+
+        orig_init(self, *args, **kws)
+
+    def query_simi(self, s1, s2):
+        assert(isinstance(s1, str))
+        assert(isinstance(s2, str))
+        if '_' in s1: s1 = s1.replace('_', ' ')
+        if '_' in s2: s2 = s2.replace('_', ' ')
+        for p in string.punctuation:
+            assert(p not in s1), s1
+        for p in string.punctuation:
+            assert(p not in s2), s2
+
+        # if seen, return directly
+        if s1 in self.relateDict and s2 in self.relateDict[s1]:
+            return self.relateDict[s1][s2]
+
+        # compute similarity
+        doc1, doc2 = self.nlp(s1), self.nlp(s2)
+        for t in doc1:
+            if not t.has_vector: print(t)
+        for t in doc2:
+            if not t.has_vector: print(t)
+        # assert(all([t.has_vector for t in doc1])), doc1
+        # assert(all([t.has_vector for t in doc2])), doc2
+        simi = max([t1.similarity(t2) for t1, t2 in itertools.product(doc1, doc2)])
+        if s1 not in self.relateDict:
+            self.relateDict[s1] = {}
+        if s2 not in self.relateDict:
+            self.relateDict[s2] = {}
+        self.relateDict[s1][s2] = simi
+        self.relateDict[s2][s1] = simi
+
+        return simi
+
+    def save_dict(self):
+        print(' saving dict.. %s' % type(self).__name__)
+        with open(self.dict_path, 'wb') as f:
+            pickle.dump(self.relateDict, f)
+
+    cls.__init__ = __init__
+    cls.query_simi = query_simi
+    cls.save_dict = save_dict
+    return cls
+
 from json.decoder import JSONDecodeError
 import requests
-import atexit
 from threading import Event
 import sys
-def enableQuery(cls):
+
+def enableQuery_(cls):
     """
     decorator to add a similarty query function to the class
     """
+    print('Decoration..')
     orig_init = cls.__init__
 
-    def __init__(self, *args, **kws):
+    def __init__(self, dict_dir='.', *args, **kws):
         """
         Caveats! Create two instances will cause two dicts opened!
             This is not a big problem.
         """
-        orig_init(self, *args, **kws)
         self.exit = False # Event()
         self.exited = True
-        self.dict_path = '%s/relateDict.pkl' % self.dict_dir
+        self.dict_path = '%s/relateDict.pkl' % dict_dir # self.dict_dir
+        print('Loading related dict..')
         with open(self.dict_path, 'rb') as f:
             relateDict = pickle.load(f)
         self.relateDict = relateDict
@@ -428,6 +547,10 @@ def enableQuery(cls):
                 There's no way they can inform each other
         """
         atexit.register(self.save_dict)
+        """
+        Caveats! put init at the end such that pre-defined variable can be used in init
+        """
+        orig_init(self, *args, **kws)
 
     @static_vars(count_query=0)
     def query_simi(self, token, keyword):

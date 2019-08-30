@@ -8,14 +8,44 @@ import warnings
 
 class Picture:
 
-    @staticmethod
-    def from_layers(layers):
+    # @staticmethod
+    # def from_layers(layers):
+    #     assert(isinstance(layers[0], LayerName))
+    #     # layernames = [l.s for l in layers]
+    #     # return Picture(layernames=layernames)
+
+    #     picture = Picture()
+    #     picture.layers_ = layers
+    #     picture.layernames_ = [l.s for l in layers]
+    #     picture.triple_set_ = set([layer.triples_ for layer in layers])
+    #     picture.layer_merge_ = LayerName()
+    #     for layer in layers:
+    #         picture.layer_merge_.absorb(layer)
+    #     picture.plot = picture.layer_merge_.plot
+    #     picture.vocab_ = picture.layer_merge_._ravel(picture.layer_merge_.nested_entities_)
+    #     return picture
+
+    """
+    use class method can avoid explicitly calling class name
+        reference:
+            * https://stackoverflow.com/questions/1950414/what-does-classmethod-do-in-this-code/1950927#1950927
+            * https://stackoverflow.com/questions/136097/what-is-the-difference-between-staticmethod-and-classmethod
+    """
+
+    @classmethod
+    def from_layers(cls_, layers):
         assert(isinstance(layers[0], LayerName))
-        picture = Picture()
-        picture.layers_ = layers
-        picture.layernames_ = [l.s for l in layers]
-        picture.triple_set_ = set([layer.triples_ for layer in layers])
-        return picture
+
+        cls = cls_()
+        cls.layers_ = layers
+        cls.layernames_ = [l.s for l in layers]
+        cls.triple_set_ = set([layer.triples_ for layer in layers])
+        cls.layer_merge_ = LayerName()
+        for layer in layers:
+            cls.layer_merge_.absorb(layer)
+        cls.plot = cls.layer_merge_.plot
+        cls.vocab_ = cls.layer_merge_._ravel(cls.layer_merge_.nested_entities_)
+        return cls
 
     """
     possible usage:
@@ -32,7 +62,8 @@ class Picture:
             self.img_name = img_name
             self.layernames_ = getLayerNames(img_name)
         else:
-            warnings.warn('Caveats! Picture initialized from layers!')
+            # warnings.warn('Caveats! Picture initialized from layers!')
+            self.img_name = img_name
             self.layernames_ = layernames
 
         if self.layernames_:
@@ -49,7 +80,8 @@ class Picture:
             # vocab is a set, no duplicates
             self.vocab_ = self.layer_merge_._ravel(self.layer_merge_.nested_entities_)
 
-            self.triple_set_ = set([layer.triples_ for layer in self.layers_])
+            # self.triple_set_ = set([layer.triples_ for layer in self.layers_])
+            self.triples_ = [t for layer in self.layers_ for t in layer.triples_]
 
     def __repr__(self):
         """
@@ -66,10 +98,12 @@ class Picture:
         # but it should make no difference if ravel the keywords as features
         # lets omit it for now
         # ! the order of layers doesn't matter
-        return self.triple_set_ == other.triple_set_
+        # return self.triple_set_ == other.triple_set_
+        return self.layers_ == other.layers_
 
     def __hash__(self):
-        return hash(tuple(self.triple_set_))
+        # return hash(tuple(self.triple_set_))
+        return hash(self.layers_)
 
     def __len__(self):
         return len(self.layers_)
@@ -118,7 +152,7 @@ from collections import defaultdict
 class LayerName:
     @staticmethod
     def from_nested_entities(nested_entities):
-        assert(isinstance(nested_entities_, dict))
+        assert(isinstance(nested_entities, dict))
         layer = LayerName()
         layer.nested_entities_ = nested_entities
         layer.entities_ = layer._get_entities()
