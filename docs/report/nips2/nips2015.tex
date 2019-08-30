@@ -102,14 +102,23 @@
 		\#~layer & $151$ & $14$ & $9$\\
 		\midrule
 		\#~background & $0$ & $0$ & $1$\\
-		\#~accessory & $11$ & $0$ & $2$\\
 		\#~character & $74$ & $9$ & $3$\\
 		\#~surrounding & $66$ & $5$ & $3$\\
+		\#~accessory & $11$ & $0$ & $2$\\
 		
 		\bottomrule
 	\end{tabular}%}
 	\label{tab: feat}
 \end{table}
+
+Suppose under each category there is only one layer or none, the total number of possible combinations of layers is (1+1)*(74+1)*(86+1)*(13+1) = 182,700.
+
+Things to do:
+\begin{itemize}
+	\item Slice new pictures
+	\item Use sliced layers in current pictures to compose new pictures
+	\item paraphrase the description
+\end{itemize}
 
 \section{Metric}
 \subsection{Layer-layer similarity}
@@ -154,21 +163,87 @@ Currently we have 90 pairs of pictures and descriptions. Let us randomly choose 
 
 Using the above metric to measure the similarity between generated pictures and true pictures, the overall average performance on the training set is 0.496. In contrast, the performance on the test set is 0.333. The prominent gap means the model needs to improve the ability to utilize existing materials.
 
+%\begin{table}[htbp]
+%	\caption{Generation score}
+%	\centering
+%	\begin{tabular}{rcccc}
+%		\toprule
+%				 & \multicolumn{2}{c}{Random picture} & \multicolumn{2}{c}{Model}\\
+%		\cmidrule{2-3}\cmidrule{4-5}
+%				 & train &  test & train & test\\
+%		\midrule
+%		mIoU & 0.22 & 0.20 & 0.39 & 0.24  \\   
+%		\bottomrule
+%	\end{tabular}%}
+%	\label{tab: feat}
+%\end{table}
+
 \begin{table}[htbp]
-	\caption{Generation score}
+	\caption{Generation score (ConceptNet relatedness)}
 	\centering
-	\begin{tabular}{rcccc}
+	\begin{tabular}{rccccccccc}
 		\toprule
-				 & \multicolumn{2}{c}{Random picture} & \multicolumn{2}{c}{Model}\\
-		\cmidrule{2-3}\cmidrule{4-5}
-				 & train &  test & train & test\\
+				 & \multicolumn{8}{c}{mIoU} & \multirow{3}{*}{Runtime(sec)}\\
+		\cmidrule{2-9}
+				 & \multicolumn{2}{c}{overall} & \multicolumn{2}{c}{subject} & \multicolumn{2}{c}{action} & \multicolumn{2}{c}{object} & \\
+		\cmidrule{2-3}\cmidrule{4-5}\cmidrule{6-7}\cmidrule{8-9}
+				 & train &  test &  train &  test &  train &  test &  train &  test & \\
 		\midrule
-		mIoU & 0.22 & 0.20 & 0.39 & 0.24  \\   
+		Random picture
+				& 0.22 & 0.20 & 	0.34		& 	0.28	  & 	0.28	  & 	0.23	 &  0.03		  & 	0.02	&  - \\
+		Graph-based generator
+				& 0.39 & 0.24 & 	0.46 & 	 0.30 & 	0.42	  & 	0.27  & 	0.22	  & 0.10 	&  0.021  \\
+				\makecell{Exhaustive search\\(Beam=2*20*20*2)}
+				% & 0.28 & 0.25 &  			& 		  & 		 & 		& 			&		& 12.9\\
+				& 0.26 & 0.23 & 0.34 & 0.28 & 0.34 & 0.37 & 0.05 & 0.04 & 12.9\\
 		\bottomrule
 	\end{tabular}%}
 	\label{tab: feat}
 \end{table}
 
+\begin{table}[htbp]
+	\caption{Generation score w/o background (ConceptNet relatedness)}
+	\centering
+	\begin{tabular}{rccccccccc}
+		\toprule
+				 & \multicolumn{8}{c}{mIoU} & \multirow{3}{*}{Runtime(sec)}\\
+		\cmidrule{2-9}
+				 & \multicolumn{2}{c}{overall} & \multicolumn{2}{c}{subject} & \multicolumn{2}{c}{action} & \multicolumn{2}{c}{object} & \\
+		\cmidrule{2-3}\cmidrule{4-5}\cmidrule{6-7}\cmidrule{8-9}
+				 & train &  test &  train &  test &  train &  test &  train &  test & \\
+		\midrule
+		Random picture
+				& 0.23 & 0.17 & 0.28 & 0.19 & 0.34 & 0.32 & 0.07 & 0.04 &   - \\
+		Graph-based generator
+				& 0.50 & 0.30 & 0.60 & 0.38 & 0.54 & 0.35 & 0.30 & 0.13 & 0.021  \\
+				\makecell{Exhaustive search\\(Beam=2*20*20*2)}
+				& 0.26 & 0.24 & 0.35 & 0.31 & 0.36 & 0.35 & 0.06 & 0.03 & 12.9\\
+				% & 0.28 & 0.25 &  			& 		  & 		 & 		& 			&		& 12.9\\
+		\bottomrule
+	\end{tabular}%}
+	\label{tab: feat}
+\end{table}
+
+
+% use conceptNet relatedness improve performance on training set.
+% but not on test set
+% because on test set, the major problem is the material does not exist, rather than deviation in locating the material.
+\begin{table}[htbp]
+	\caption{Generation score (GloVe cosine similarity; metric stays the same)}
+	\centering
+	\begin{tabular}{rccc}
+		\toprule
+				 & \multicolumn{2}{c}{mIoU} & \multirow{2}{*}{Runtime(sec)}\\
+		\cmidrule{2-3}
+				 & train &  test & \\
+		\midrule
+		Random picture & 0.22 & 0.20 &  - \\   
+		Graph-based generator & 0.29 & 0.23 & 0.021\\
+		Exhaustive search (Beam=2*20*20*2) & 0.28 & 0.24 & 12.9\\
+		\bottomrule
+	\end{tabular}%}
+	\label{tab: feat}
+\end{table}
 
 The following lists some specific issues of the model reflected from the test results. 
 \begin{enumerate}
