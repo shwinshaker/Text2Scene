@@ -327,7 +327,7 @@ class CategEncoder():
 
 ### text encoder
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
-from tools.text_process import LemmaTokenizer
+# from tools.text_process import LemmaTokenizer
 
 class TfidfEncoder():
     def __init__(self, txt_dir='text', index=None):

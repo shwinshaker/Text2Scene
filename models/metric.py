@@ -1,5 +1,4 @@
 #!./env python
-
 from tools.instance import Node, CombToken
 from tools.containers import Picture
 from tools.common import enableQuery, enableQuery_
@@ -21,9 +20,9 @@ class WeightedMeanIOU:
         set2 = [l for l in p2.layers_]
         if not with_bg:
             set1 = [l for l in p1.layers_ if getSubj(str(l)) != 'background']
-            print(set1)
+            # print(set1)
             set2 = [l for l in p2.layers_ if getSubj(str(l)) != 'background']
-            print(set2)
+            # print(set2)
         l1 = len(set1)
         l2 = len(set2)
         inter_simi = []
