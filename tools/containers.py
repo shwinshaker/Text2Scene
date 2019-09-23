@@ -1,21 +1,50 @@
 #!./env python
 
 from .image_process import getLayerNames, checkLayerName
-from .text_process import SpacyLemmaTokenizer, SimpleLemmaTokenizer
-# from .common import ravel
+from .text_process import SimpleLemmaTokenizer
 import copy
 import warnings
 
 class Picture:
 
-    @staticmethod
-    def from_layers(layers):
+    # @staticmethod
+    # def from_layers(layers):
+    #     assert(isinstance(layers[0], LayerName))
+    #     # layernames = [l.s for l in layers]
+    #     # return Picture(layernames=layernames)
+
+    #     picture = Picture()
+    #     picture.layers_ = layers
+    #     picture.layernames_ = [l.s for l in layers]
+    #     picture.triple_set_ = set([layer.triples_ for layer in layers])
+    #     picture.layer_merge_ = LayerName()
+    #     for layer in layers:
+    #         picture.layer_merge_.absorb(layer)
+    #     picture.plot = picture.layer_merge_.plot
+    #     picture.vocab_ = picture.layer_merge_._ravel(picture.layer_merge_.nested_entities_)
+    #     return picture
+
+    """
+    use class method can avoid explicitly calling class name
+        reference:
+            * https://stackoverflow.com/questions/1950414/what-does-classmethod-do-in-this-code/1950927#1950927
+            * https://stackoverflow.com/questions/136097/what-is-the-difference-between-staticmethod-and-classmethod
+    """
+
+    @classmethod
+    def from_layers(cls_, layers):
         assert(isinstance(layers[0], LayerName))
-        picture = Picture()
-        picture.layers_ = layers
-        picture.layernames_ = [l.s for l in layers]
-        picture.triple_set_ = set([layer.triples_ for layer in layers])
-        return picture
+
+        cls = cls_()
+        cls.layers_ = layers
+        cls.layernames_ = [l.s for l in layers]
+        cls.triple_set_ = set([layer.triples_ for layer in layers])
+        cls.layer_merge_ = LayerName()
+        for layer in layers:
+            cls.layer_merge_.absorb(layer)
+        cls.plot = cls.layer_merge_.plot
+        cls.vocab_ = cls.layer_merge_._ravel(cls.layer_merge_.nested_entities_)
+        return cls
 
     """
     possible usage:
@@ -32,7 +61,8 @@ class Picture:
             self.img_name = img_name
             self.layernames_ = getLayerNames(img_name)
         else:
-            warnings.warn('Caveats! Picture initialized from layers!')
+            # warnings.warn('Caveats! Picture initialized from layers!')
+            self.img_name = img_name
             self.layernames_ = layernames
 
         if self.layernames_:
@@ -49,7 +79,8 @@ class Picture:
             # vocab is a set, no duplicates
             self.vocab_ = self.layer_merge_._ravel(self.layer_merge_.nested_entities_)
 
-            self.triple_set_ = set([layer.triples_ for layer in self.layers_])
+            # self.triple_set_ = set([layer.triples_ for layer in self.layers_])
+            self.triples_ = [t for layer in self.layers_ for t in layer.triples_]
 
     def __repr__(self):
         """
@@ -66,10 +97,12 @@ class Picture:
         # but it should make no difference if ravel the keywords as features
         # lets omit it for now
         # ! the order of layers doesn't matter
-        return self.triple_set_ == other.triple_set_
+        # return self.triple_set_ == other.triple_set_
+        return self.layers_ == other.layers_
 
     def __hash__(self):
-        return hash(tuple(self.triple_set_))
+        # return hash(tuple(self.triple_set_))
+        return hash(self.layers_)
 
     def __len__(self):
         return len(self.layers_)
@@ -92,7 +125,6 @@ class Description:
             assert(text)
             self.text_ = text
 
-        # tokenizer = SpacyLemmaTokenizer()
         tokenizer = SimpleLemmaTokenizer()
         self.tokens_ = tokenizer(self.text_)
 
@@ -110,17 +142,19 @@ class Description:
         return hash(self.text_)
 
 
-from tools.instance import Node
-from tools.common import absorbNestedDict, ddict2dict
+from .instance import Node
+from .common import absorbNestedDict, ddict2dict, nested2Str
 import re
 from collections import defaultdict
+from rules import labels
 
 class LayerName:
     @staticmethod
     def from_nested_entities(nested_entities):
-        assert(isinstance(nested_entities_, dict))
+        assert(isinstance(nested_entities, dict))
         layer = LayerName()
         layer.nested_entities_ = nested_entities
+        layer.s = nested2Str(nested_entities)
         layer.entities_ = layer._get_entities()
         layer.triples_ = layer._get_triples()
         return layer
@@ -189,6 +223,12 @@ class LayerName:
                     s = re.sub('(?<=[\[,])%s(?=\()' % subj,
                                '%s%i' % (subj, i+1), s, count=1)
         return s
+
+    def _get_categ(self):
+        for categ in labels.subjects:
+            if list(self.entities_['subj'])[0].t in labels.subjects[categ]:
+                return categ
+        raise KeyError('category not found for subject %s' % self.entities_['subj'][0])
 
     def _get_subjs(self):
         """
@@ -318,13 +358,16 @@ class LayerName:
 
         entities = defaultdict(lambda: defaultdict(int))
         for subj in self.nested_entities_:
-            assert(subj not in entities['subj']), subj
-            entities['subj'][subj] += subj.count #.add(subj)
+            if subj:
+                assert(subj not in entities['subj']), subj
+                entities['subj'][subj] += subj.count #.add(subj)
             for act in self.nested_entities_[subj]:
-                # same actions in different subject will be counted separately
-                entities['act'][act] += act.count #.add(act)
+                if act:
+                    # same actions in different subject will be counted separately
+                    entities['act'][act] += act.count #.add(act)
                 for obj in self.nested_entities_[subj][act]:
-                    entities['obj'][obj] += obj.count #.add(obj)
+                    if obj:
+                        entities['obj'][obj] += obj.count #.add(obj)
         return ddict2dict(entities)
 
     def _get_triples(self):
@@ -467,7 +510,7 @@ class LayerName:
         #         for obj in self.nested_entities_[subj][act]:
         #             print('%s(subj) - %s(act) - %s(obj)' % (subj, act, obj))
 
-    def plot(self, save_fig=False):
+    def plot(self, save_fig=False, reset_id=True, path='results/graph', dpi=None):
 
         # regain entities, because merge entities are sets
         # entities_ = self._get_entities()
@@ -510,28 +553,299 @@ class LayerName:
 
         for subj in self.nested_entities_:
             for act in self.nested_entities_[subj]:
-                if act.t != 'have':
+                if subj and act:
+                    # if act.t != 'have':
                     xs, ys = list(zip(get_xy(subj, 'subj'), get_xy(act, 'act')))
                     plt.plot(xs, ys, 'k-', alpha=0.1)
                     for obj in self.nested_entities_[subj][act]:
-                        xs, ys = list(zip(get_xy(act, 'act'), get_xy(obj, 'obj')))
-                        plt.plot(xs, ys, 'k-', alpha=0.1)
-                else:
-                    for obj in self.nested_entities_[subj][act]:
-                        xs, ys = list(zip(get_xy(subj, 'subj'), get_xy(obj, 'obj')))
-                        plt.plot(xs, ys, 'k:', alpha=0.1)
+                        if obj:
+                            xs, ys = list(zip(get_xy(act, 'act'), get_xy(obj, 'obj')))
+                            plt.plot(xs, ys, 'k-', alpha=0.1)
+                    # else:
+                    #     for obj in self.nested_entities_[subj][act]:
+                    #         if obj:
+                    #             xs, ys = list(zip(get_xy(subj, 'subj'), get_xy(obj, 'obj')))
+                    #             # plt.plot(xs, ys, 'k:', alpha=0.1)
+                    #             plt.plot(xs, ys, 'k-', alpha=0.1)
 
         for i, subj in enumerate(sorted(list(entities_['subj']),
                                         key=natural_keys)):
-            plt.text(1, i, '%s(%i)' % (subj, self.entities_['subj'][subj]), color='r')
+            # plt.text(1, i, '%s(%i)' % (subj, self.entities_['subj'][subj]), color='r')
+            if reset_id:
+                plt.text(1, i, '%s' % subj._reset(), color='r')
+            else:
+                plt.text(1, i, '%s' % subj, color='r')
         for i, act in enumerate(sorted(list(entities_['act']),
                                        key=natural_keys)):
-            plt.text(2, i, '%s(%i)' % (act, self.entities_['act'][act]), color='g')
+            # plt.text(2, i, '%s(%i)' % (act, self.entities_['act'][act]), color='g')
+            if reset_id:
+                plt.text(2, i, '%s' % act._reset(), color='g')
+            else:
+                plt.text(2, i, '%s' % act, color='g')
         for i, obj in enumerate(sorted(list(entities_['obj']),
                                        key=natural_keys)):
-            plt.text(3, i, '%s(%i)' % (obj, self.entities_['obj'][obj]), color='orange')
+            if reset_id:
+                plt.text(3, i, '%s' % obj._reset(), color='orange')
+            else:
+                plt.text(3, i, '%s' % obj, color='orange')
+            # plt.text(3, i, '%s(%i)' % (obj, self.entities_['obj'][obj]), color='orange')
         plt.axis('off')
         if save_fig:
-            plt.savefig('results/graph', bbox_inches='tight')
+            plt.savefig(path, bbox_inches='tight', dpi=dpi)
         # plt.show()
 
+
+#############################################################
+#############################################################
+
+import networkx as nx
+from collections import defaultdict
+from .instance import Node, CombToken
+# from tools.containers import LayerName
+from .common import ddict2dict
+from rules.consts import MISSED
+from rules import labels
+import spacy
+
+def span_key(span):
+    if not span: return Node(MISSED)
+    if re.match(r'\D*subj\D*', span.root.dep_):
+        attr = 'subj'
+    elif span.root.pos_ == 'VERB':
+        attr = 'act'
+    else:
+        attr = 'obj'
+    return Node(span.text, attr=attr, i=span.root.i)
+
+class GraphSpan:
+    """
+    extend networkx's graph instance to extend utils
+        Get: kwargs is matched sequencially when passes to sub
+    """
+    def __init__(self, G, key=None):
+        assert(isinstance(G, nx.classes.graph.Graph))
+        self.G = G
+        self.subj_dict = labels.subjects
+
+        if key: self._key = key
+
+    def copy(self):
+        return GraphSpan(self.G.copy())
+
+    def _key(self, n):
+        if not n: return self._missed_key()
+        if isinstance(n, CombToken):
+            return n.keyword
+        elif isinstance(n, Node):
+            return n
+        elif isinstance(n, spacy.tokens.Span):
+            return span_key(n)
+        else:
+            raise TypeError('Overwrite _key to get keyword!')
+
+    def _missed_key(self):
+        return Node(MISSED)
+
+    def _missed(self):
+        return CombToken(None, self._missed_key())
+
+    def to_edge(self, triplet):
+        return (triplet[0], triplet[2], {'verb': triplet[1]})
+
+    def is_strong(self, n1, n2):
+        return self.G[n1][n2]['intension'] > 0.5
+
+    def is_weakly_connected(self, n):
+        for n_ in self.G.neighbors(n):
+            if self.is_strong(n_, n):
+                return False
+        return True
+
+    def is_subj(self, n):
+        return self._key(n).attr == 'subj'
+
+    def is_obj(self, n):
+        return self._key(n).attr == 'obj'
+
+    def is_character(self, n):
+        return self._key(n).t in self.subj_dict['character']
+
+    def is_surrounding(self, n):
+        return self._key(n).t in self.subj_dict['surrounding']
+
+    def get_objs(self, weak_only=True):
+        if weak_only:
+            return [n for n in self.G.nodes if self.is_obj(n) and self.is_weakly_connected(n)]
+        return [n for n in self.G.nodes if self.is_obj(n)]
+
+    def get_subjs(self):
+        return [n for n in self.G.nodes if self.is_subj(n)]
+
+    # def get_triplets(self, subj_only=True, **kwargs):
+    def get_triplets(self, **kwargs):
+        # print('get_triplets', kwargs)
+
+        ## all the edges, i.e. triplets
+        triple_set = [self.rectify(n1, e, n2) for n1, n2, e in self.G.edges(data='verb')]
+        connected_nodes = set()
+        for n1, n2 in self.G.edges:
+            connected_nodes.add(n1)
+            connected_nodes.add(n2)
+
+        ## all the entities along with their associated verbs
+        ## only show subjects, objects will always be connected to some subjects (default: None) after rectification
+        ## showing objects will cause it be identified as subjects
+        ## or be double counted in the following pipeline??
+        ## subj_only will cause layers with no subject return empty
+        # if subj_only:
+        #     entity_set = [self.rectify(n, a, None) for n, a in self.G.nodes(data='verb') if self.is_subj(n)]
+        # else:
+            # entity_set = [self.rectify(n, a, None) for n, a in self.G.nodes(data='verb')]
+
+        ## obtain the rest nodes that are not connected
+        ## if not filter those already connected, will cause duplicate entities when layer merged in nested_entities dict
+        # entity_set = [self.rectify(n, a, None) for n, a in self.G.nodes(data='verb') if n not in connected_nodes]
+        entity_set = []
+        for n, a_l in self.G.nodes(data='verbs'):
+            if self.is_subj(n):
+                entity_set.append(self.rectify(n, None, None))
+                if a_l:
+                    for a in a_l:
+                        entity_set.append(self.rectify(n, a, None))
+            else:
+                    # objects are not allowed here if already appears
+                    # subjects can because nested_dict will absorb them
+                    # may need review later. Maybe save the entities as two nested dict like a graph, the third level only means its neighbor
+                    # but this may needs an entire change in all containers
+                if n not in connected_nodes:
+                    entity_set.append(self.rectify(n, None, None))
+                    #     for a in a_l:
+                    #         entity_set.append(self.rectify(n, a, None))
+
+        # entity_set = [self.rectify(n, a, None) for n, a_l in self.G.nodes(data='verbs') if a_l for a in a_l if n not in connected_nodes]
+        return triple_set + entity_set
+
+    def get_nested_entities(self, key=None, #lambda x: x,
+                            **kwargs):
+        # print('get_nested_entities', kwargs)
+
+        if not key: key = self._key
+
+        nested_entities = {} #defaultdict(lambda: defaultdict(set))
+        for n1, v, n2 in self.get_triplets(**kwargs):
+            if key(n1) not in nested_entities:
+                nested_entities[key(n1)] = {}
+            if key(v) not in nested_entities[key(n1)]:
+                nested_entities[key(n1)][key(v)] = set()
+            if key(n2):
+                nested_entities[key(n1)][key(v)].add(key(n2))
+        return ddict2dict(nested_entities)
+
+    def get_nested_entities_dict(self, **kwargs):
+        dic = {'character': [],
+               'surrounding': [],
+               'unidentified': []}
+        nested_ = self.get_nested_entities(**kwargs)
+        for key in nested_:
+            if key:
+                if self.is_character(key):
+                    dic['character'].append({key: nested_[key]})
+                elif self.is_surrounding(key):
+                    dic['surrounding'].append({key: nested_[key]})
+                else:
+                    raise KeyError('Subject not found! %s' % key)
+            else:
+                dic['unidentified'].append({key: nested_[key]})
+        return dic
+
+    def rectify(self, n1, e, n2):
+        return self.filter_none(self.reorder(n1, e, n2))
+
+    def reorder(self, n1, e, n2):
+        """
+        reorder the triplet such that the first is always a subject
+            and better be a character if a deuce
+        """
+        if n1 and n2:
+            # if both subjects, make sure n1 is character
+            if self.is_subj(n1) and self.is_subj(n2):
+                if self.is_character(n2):
+                    return (n2, e, n1)
+            if self.is_obj(n1):
+                if self.is_obj(n2):
+                    warnings.warn('Two objects coexist in a triplet!')
+                # assert(self.is_subj(n2)), (n1, e, n2)
+                return (n2, e, n1)
+            # this to make sure only n1 will be checked
+            # if n1 and n2 are both subjects, e.g. bear -> wild accidentally
+            # then keep the order
+            return (n1, e, n2)
+        if n1:
+            if self.is_obj(n1):
+                return (n2, e, n1)
+            return (n1, e, n2)
+        # only explicitly check n2 when n1 is None
+        if n2:
+            if self.is_subj(n2):
+                return (n2, e, n1)
+        return (n1, e, n2)
+
+    def filter_none(self, tup):
+        tup_ = []
+        # todo
+        # for c, attr in zip(tup, ['subj', 'act', 'obj']):
+        #     tup_.append(c if c else self._missed(attr=attr))
+        for c in tup:
+            tup_.append(c if c else self._missed())
+        return tuple(tup_)
+
+    def plot(self, style='networkx', **kwargs):
+        # print('plot', kwargs)
+
+        if style == 'networkx':
+            self.plot_network(**kwargs)
+        elif style == 'layer':
+            self.plot_layer(**kwargs)
+        else:
+            raise KeyError('Available style: networkx and layer')
+
+    def plot_network(self, edge=False):
+        """
+        Use networkx's graph plot
+        """
+        nx.draw(self.G, with_labels=True,
+                font_weight='bold', node_size=50)
+
+        if edge:
+            pos = nx.spring_layout(self.G)
+            # nx.draw_networkx_nodes(G, pos=pos, node_size=50)
+            # nx.draw_networkx_labels(G, pos=pos)
+            # nx.draw_networkx_edges(G, pos=pos, edge_color='k', width=1)
+            edge_labels = nx.get_edge_attributes(self.G,'verb')
+            nx.draw_networkx_edge_labels(self.G, pos=pos,
+                                         edge_labels=edge_labels)
+
+    def plot_layer(self, collapse=False, key=None, **kwargs):
+        """
+        call layerName.plot to plot triplets
+        """
+        if key: self._key = key
+
+        # print('plot_layer', kwargs)
+
+        if not collapse:
+            nested_entities = self.get_nested_entities(**kwargs)
+            layer = LayerName.from_nested_entities(nested_entities)
+            layer.plot(**kwargs)
+        else:
+            # todo
+            # layer = LayerName
+            layers = []
+            for n1, v, n2 in self.get_triplets():
+                nested_entities = defaultdict(lambda: defaultdict(set))
+                nested_entities[to_node(n1, 'subj', reset=True)][to_node(v, 'act', reset=True)].add(to_node(n2, 'obj', reset=True))
+                layer = LayerName.from_nested_entities(ddict2dict(nested_entities))
+                # print(layer.nested_entities_)
+                layers.append(layer)
+            picture = Picture.from_layers(layers)
+            picture.plot(**kwargs)
