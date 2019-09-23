@@ -1,0 +1,126 @@
+html, body {
+  background: url('https://images.unsplash.com/photo-1525024917383-14967b1980f5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=1950&q=80') center center no-repeat fixed;
+  background-size: cover;
+  color: white;
+  height: 100%;
+  width: 100%;
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.App-logo {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 1em;
+  max-height: 200px;
+  /* height: 40vmin; */
+  pointer-events: none;
+}
+
+.App-logo-small {
+  display: block;
+  margin: auto;
+  padding: 0.2em;
+  max-width: 100px;
+  max-height: 150px;
+  /* height: 40vmin; */
+  pointer-events: none;
+}
+
+.p {
+  /* display: block; */
+  /* margin: auto; */
+  margin: 0;
+  padding: 1.0ex 0 0;
+  font-size: 1.5ex;
+}
+
+.Row {
+  display: block;
+  margin: auto;
+}
+
+.Row-small {
+  display: block;
+  margin: auto;
+  max-height: 150px;
+}
+
+.Col {
+  display: block;
+  margin: auto;
+}
+
+.App-logo-spin {
+  animation: App-logo-spin infinite 5s linear;
+  display: block;
+  margin: auto;
+  padding: 1em;
+  max-height: 200px;
+  pointer-events: none;
+}
+
+.content {
+  margin: auto;
+  margin-top: 20px;
+  width: 70%;
+  height: auto;
+  background-color: #fff;
+  padding: 20px;
+  margin-bottom: 80px;
+  border-radius: 8px;
+}
+
+.title {
+  padding-top: 80px;
+  text-align: center;
+  text-transform: uppercase;
+  font-weight: 600;
+  font-size: 2em;
+  letter-spacing: 0.15rem;
+  color: #fff;
+}
+
+label {
+  color: #333;
+}
+
+.result-container {
+  text-align: center;
+  font-weight: 600;
+  font-size: 4em;
+  letter-spacing: 0.15rem;
+  padding: 20px 0 0;
+}
+
+.word-container {
+  padding: 15px 5px 0;
+  text-align: left;
+}
+
+#result {
+  color: #000;
+}
+
+#word {
+  color: #f80;
+  font-weight: 600;
+}
+
+#suggest-word {
+  color: #f80;
+  font-weight: 600;
+}
+
+#suggest-word:hover {
+  font-weight: 800;
+  cursor: pointer;
+}

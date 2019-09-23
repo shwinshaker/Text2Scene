@@ -1,11 +1,11 @@
 #!./env python
 
-from tools.image_process import stack_svgs
+from lib.tools.image_process import stack_svgs
+from lib.models.predictor import Predict1
 import argparse
-from models.predictor import Predict1
 
 # initialize predictor
-predict = Predict1()
+predict = Predict1(img_dir='dataset/images')
 
 # arguments
 parser = argparse.ArgumentParser()
@@ -14,9 +14,9 @@ args = parser.parse_args()
 print(args.query)
 
 # retrieve and stack materials
-materials = ['material/%s.png' % l.s for l in predict(args.query)]
+materials = ['dataset/material/%s.png' % l.s for l in predict(args.query)]
 if not materials:
     print('Generation error! No material is retrieved!')
 else:
     stack_svgs(materials)
-    print('\n output to stack.svg')
+    print('\n output to ./stack.svg')
