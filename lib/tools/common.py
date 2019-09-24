@@ -428,18 +428,25 @@ def wait(secs=10):
         print('- %i' % (i+1), end='\r')
         time.sleep(1)
 
+# set default dict paths
+import yaml
+with open("config.yml", 'r') as f:
+    config = yaml.safe_load(f)
+
 import spacy
 import itertools
 class QuerySimi:
     """
     class method to query similarity
     """
-    def __init__(self, dict_dir='extras'):
+    # def __init__(self, dict_dir='extras'):
+    def __init__(self, dict_path=config['dict_path']['GloVe']):
         print('Loading GloVe model.. ')
         self.nlp = spacy.load("en_core_web_md")
         print('Loaded.')
 
-        self.dict_path = '%s/relateDictGloVe.pkl' % dict_dir # self.dict_dir
+        # self.dict_path = '%s/relateDictGloVe.pkl' % dict_dir # self.dict_dir
+        self.dict_path = dict_path
         print('Loading related dict..')
         with open(self.dict_path, 'rb') as f:
             relateDict = pickle.load(f)
@@ -560,7 +567,7 @@ def enableQuery_(cls, dict_dir='extras'):
     print('Decoration..')
     orig_init = cls.__init__
 
-    def __init__(self, *args, **kws): #, dict_dir='.'):
+    def __init__(self, *args, **kws):
         """
         Caveats! Create two instances will cause two dicts opened!
             This is not a big problem.

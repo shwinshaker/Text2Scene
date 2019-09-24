@@ -11,13 +11,13 @@ pip install -r 'requirements.txt'
 
 * If `hunspell` not install correctly, please refer to [spacy_hunspell](https://github.com/tokestermw/spacy_hunspell/blob/master/README.md) and manually install it.
 
-* `hunspell` requires to specify the path of the dictionary `en_US.dic`. Normally on linux is `/usr/share/hunspell`. Check `lib/tools/text_process.py` to change accordingly.
+* `hunspell` requires to specify the path of the dictionary `en_US.dic`. Normally on linux is `/usr/share/hunspell`. Check `config.yml` to change accordingly.
 
 * Necessary models for `spaCy` needs to be downloaded, such as `en_core_web_sm` and `en_core_web_md`.
 
 ## Offline demo
 ```
-demo.py <text_input>
+./demo.py <text_input>
 ```
 
 ## Backend (flask)

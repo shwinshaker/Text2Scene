@@ -1,0 +1,19 @@
+data_path:
+    Images: dataset/images
+    Text: dataset/text
+    Material: dataset/material
+    Images_train: dataset/images_train
+    Images_test: dataset/images_val
+
+dict_path:
+    ConceptNet: extras/relateDict.pkl
+    GloVe: extras/relateDictGloVe.pkl
+    Frequent: extras/google-10000-english-usa-no-swears.txt
+    English:
+        darwin: /Users/dongjustin/Library/Spelling/en_US
+        linux: /usr/share/hunspell
+
+ssh:
+    host: 202.120.188.239
+    user: cy
+    port: 7140

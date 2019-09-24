@@ -13,10 +13,11 @@ import os
 from spacy.tokens import Doc, Span, Token
 from hunspell import HunSpell
 
-DEFAULT_DICTIONARY_PATHS = {
-    'darwin': '/Users/dongjustin/Library/Spelling/en_US',
-    'linux': '/usr/share/hunspell',
-}
+import yaml
+with open("config.yml", 'r') as f:
+    config = yaml.safe_load(f)
+
+DEFAULT_DICTIONARY_PATHS = config['dict_path']['English']
 
 class spaCyHunSpell(object):
 
